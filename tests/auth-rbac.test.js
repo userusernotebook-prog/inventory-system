@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const argon2 = require('argon2');
+const { generate } = require('otplib');
 const { migrate } = require('../src/db/migrate');
 const { createAuthRepository } = require('../src/modules/auth/auth.repository');
 const { createAuthService } = require('../src/modules/auth/auth.service');
@@ -92,6 +93,25 @@ test('login cria sessão vinculada ao usuário, com senha Argon2', async () => {
     assert.equal(authenticated.id, Number(adminId));
     assert.equal(authenticated.profile_base, 'ADMIN');
     assert.equal(repository.findById(adminId).last_login_at !== null, true);
+  } finally {
+    db.close();
+  }
+});
+
+test('2FA só é confirmado com um código TOTP válido', async () => {
+  const { db, repository, service, adminId } = await makeContext();
+  try {
+    const admin = repository.findById(adminId);
+    const enrollment = service.setupTotp(admin);
+    await assert.rejects(service.confirmTotp(admin, '000000'), /TOTP inválido/);
+    const code = await generate({ secret: enrollment.secret });
+    assert.deepEqual(await service.confirmTotp(admin, code), { ok: true });
+    const login = await service.login({
+      email: 'admin@example.test',
+      password: 'SenhaInicialForte1',
+      totp_code: code
+    });
+    assert.ok(login.token);
   } finally {
     db.close();
   }

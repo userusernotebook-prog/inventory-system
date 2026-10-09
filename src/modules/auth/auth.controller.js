@@ -38,8 +38,8 @@ function createAuthController(service) {
     setupTotp(req, res) {
       res.json(service.setupTotp(req.user));
     },
-    confirmTotp(req, res) {
-      res.json(service.confirmTotp(req.user, req.validated.body.code));
+    async confirmTotp(req, res) {
+      res.json(await service.confirmTotp(req.user, req.validated.body.code));
     },
     listUsers(req, res) {
       res.json(service.listUsers());

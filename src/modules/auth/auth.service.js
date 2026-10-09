@@ -68,7 +68,7 @@ function createAuthService(repository, auditService) {
     }
     if (
       user.totp_enabled &&
-      !verify({ token: String(input.totp_code || ''), secret: user.totp_secret })
+      !(await verify({ token: String(input.totp_code || ''), secret: user.totp_secret }))
     )
       throw new UnauthorizedError('Código de autenticação inválido.');
     repository.updateLogin(user.id);
@@ -168,9 +168,9 @@ function createAuthService(repository, auditService) {
       repository.setTotp(user.id, secret, false);
       return { secret, uri: generateURI({ issuer: 'Inventário TI', label: user.email, secret }) };
     },
-    confirmTotp(user, code) {
+    async confirmTotp(user, code) {
       const fresh = repository.findById(user.id);
-      if (!verify({ token: code, secret: fresh.totp_secret }))
+      if (!(await verify({ token: code, secret: fresh.totp_secret })))
         throw new ValidationError('Código TOTP inválido.');
       repository.setTotp(user.id, fresh.totp_secret, true);
       return { ok: true };
