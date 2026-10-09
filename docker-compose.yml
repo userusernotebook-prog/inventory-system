@@ -6,10 +6,12 @@ services:
       NODE_ENV: production
       PORT: 3000
       APP_ORIGIN: ${APP_ORIGIN}
-      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY}
+      TOTP_ENCRYPTION_KEY_FILE: /run/secrets/totp_encryption_key
       EMPLOYEE_ANONYMIZATION_DAYS: ${EMPLOYEE_ANONYMIZATION_DAYS:-1825}
     volumes:
       - inventory-data:/app/data
+    secrets:
+      - totp_encryption_key
     expose:
       - '3000'
     healthcheck:
@@ -57,3 +59,7 @@ services:
 
 volumes:
   inventory-data:
+
+secrets:
+  totp_encryption_key:
+    file: ${TOTP_ENCRYPTION_KEY_SECRET_FILE:-./secrets/totp_key.txt}

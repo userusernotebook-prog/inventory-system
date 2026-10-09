@@ -20,6 +20,7 @@
 *.crt
 /deploy/certs/
 /external-backups/
+/secrets/
 /data/
 *.db
 *.db-wal

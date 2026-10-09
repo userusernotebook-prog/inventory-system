@@ -46,7 +46,7 @@ npm run web:dev
 
 `ADMIN_PASSWORD` e `ADMIN_PASSWORD_FILE` sao usados somente por `create-admin` e `reset-admin`; eles nao devem permanecer em `.env`. Prefira um segredo temporario injetado pelo ambiente ou um arquivo de secret com permissao restrita.
 
-`TOTP_ENCRYPTION_KEY` deve conter 32 bytes aleatorios codificados em base64. Guarde-a em um cofre de segredos ou Docker secret separado dos backups; nunca no banco, no repositório ou na mesma montagem externa de backup. A aplicacao nao inicia sem a chave. Para rotaciona-la, execute uma migracao controlada que decifre cada segredo com a chave antiga e o cifre com a nova, altere a chave no cofre e reinicie todos os processos. Se a chave for perdida, use `npm run reset-admin` para reiniciar o 2FA do administrador e recadastre os demais usuarios.
+`TOTP_ENCRYPTION_KEY` deve conter 32 bytes aleatorios codificados em base64. Gere-a com `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. No Docker Compose, salve o resultado em `./secrets/totp_key.txt` ou defina `TOTP_ENCRYPTION_KEY_SECRET_FILE` para um arquivo protegido fora do repositório; o Compose o monta somente em `/run/secrets/totp_encryption_key` no serviço `app`. Guarde-a em um cofre de segredos separado dos backups; nunca no banco, no repositório ou na mesma montagem externa de backup. Para rotaciona-la, decifre os segredos com a chave antiga e cifre-os com a nova em uma manutenção controlada, substitua o arquivo do secret e reinicie todos os processos. Se a chave for perdida, use `npm run reset-admin` para reiniciar o 2FA do administrador e recadastre os demais usuarios.
 
 ## Arquitetura
 
