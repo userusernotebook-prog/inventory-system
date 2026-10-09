@@ -1,108 +1,160 @@
-# Sistema de Gestão de Ativos
+# Sistema de Inventario de Ativos de TI
 
-Protótipo funcional criado a partir da estrutura da planilha **\_BASE DE CHAMADOS E RELATORIOS - ISDIN - Q1-2025.xlsm**.
+Aplicacao corporativa para cadastro de funcionarios, ativos, chamados, movimentacoes, desligamentos e aprovacoes. O backend usa Express 5 e SQLite; o frontend e React, Vite, TypeScript, Tailwind e React Query.
 
-## O que já faz
+## Instalacao local
 
-- Cadastro de funcionários e ativos.
-- Estados do ativo: **em uso, backup, manutenção e desativado**.
-- Um ativo em uso possui uma atribuição aberta a um funcionário.
-- Histórico permanente de cada movimentação.
-- Fluxo de desligamento: cada equipamento do funcionário precisa ir para **backup**, **manutenção** ou **desativado**. A operação é transacional.
-- Cadastro de chamados: ao selecionar o funcionário, o sistema mostra automaticamente os equipamentos atribuídos a ele.
-- Dashboard com três visões: resumo executivo, ativos e chamados. Os painéis de ativos e chamados têm filtros; os gráficos usam os registros do banco.
-- Técnico se identifica pelo nome, sem login, como solicitado.
-- Administrador entra com senha e pode acessar importação e auditoria.
-- Importação inicial pelo modelo das abas `Funcionarios` e `Ativos`, além de compatibilidade com a planilha antiga.
-- Importador usa **lista permitida de campos** e não importa outros dados/credenciais da planilha.
-- Banco SQLite em modo WAL, chaves estrangeiras e índices para uso interno por pequena equipe.
+Requer Node.js 22 LTS e npm. Instale as dependencias, copie as variaveis de exemplo e inicie:
 
-## Executar
-
-Requer Node.js 20.19+ (ou 22.13+/24+) para executar também o ESLint.
-
-```bash
+```powershell
 npm ci
-```
-
-Copie `.env.example` para `.env`, escolha uma senha própria em `ADMIN_PASSWORD` e inicie:
-
-```bash
+Copy-Item .env.example .env
 npm start
 ```
 
-No PowerShell, a cópia pode ser feita com `Copy-Item .env.example .env`. Variáveis definidas no ambiente têm prioridade sobre o arquivo `.env`. O servidor não inicia sem `ADMIN_PASSWORD` ou com `admin123`; `PORT` deve estar entre 1 e 65535.
+Abra `http://localhost:3000`. O primeiro administrador e criado somente no servidor:
 
-Abra `http://localhost:3000` (ou a porta configurada).
+```powershell
+npm run create-admin
+```
 
-## Qualidade do código
+O comando pede os dados e configura uma senha segura. O administrador deve registrar o TOTP no primeiro login. Para desenvolvimento do frontend separado:
 
-```bash
-npm test
+```powershell
+npm run web:dev
+```
+
+## Variaveis de ambiente
+
+| Variavel                      | Uso                                             | Padrao                  |
+| ----------------------------- | ----------------------------------------------- | ----------------------- |
+| `PORT`                        | Porta HTTP da aplicacao                         | `3000`                  |
+| `NODE_ENV`                    | `development`, `test` ou `production`           | `development`           |
+| `APP_ORIGIN`                  | Origem HTTPS publica aceita para cookies e CORS | obrigatoria em producao |
+| `EMPLOYEE_ANONYMIZATION_DAYS` | Dias ate anonimizar funcionarios desligados     | `1825`                  |
+| `DATABASE_PATH`               | Caminho do SQLite para o backup                 | `data/inventory.db`     |
+| `BACKUP_DIR`                  | Diretorio local dos backups                     | `data/backups`          |
+| `BACKUP_EXTERNAL_DIR`         | Montagem externa para segunda copia             | opcional                |
+| `BACKUP_RETENTION_DAYS`       | Retencao dos backups em dias                    | `30`                    |
+| `BACKUP_INTERVAL_SECONDS`     | Intervalo do servico Docker de backup           | `86400`                 |
+
+`APP_ORIGIN` deve ser a URL final, por exemplo `https://inventario.empresa.com`. Nunca versione `.env`, certificados ou `data/`.
+
+## Arquitetura
+
+```
+src/
+  config/              configuracao validada
+  db/                  conexao e migrations versionadas
+  modules/<modulo>/    routes, controller, service, repository e schema
+  shared/              erros, middlewares e utilitarios
+  app.js               factory Express injetavel
+  server.js            processo HTTP de producao
+frontend/              React + Vite + TypeScript
+tests/unit/            dominio, permissoes e services
+tests/integration/     API Express + SQLite em memoria
+e2e/                   fluxo completo com Playwright
+```
+
+As rotas validam Zod e delegam aos services. Services concentram transacoes e regras; repositories sao a unica camada com SQL. Migrations em `src/db/migrations` sao registradas em `schema_migrations` e aplicadas sem apagar dados existentes.
+
+## Perfis e permissoes
+
+As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conceder ou negar permissoes individuais; `deny` sempre vence. Alcances opcionais por cidade, departamento e tipo de equipamento sao aplicados nos services e repositories.
+
+| Perfil       | Acesso padrao                                                                 |
+| ------------ | ----------------------------------------------------------------------------- |
+| `ADMIN`      | Tudo, incluindo auditoria, usuarios e aprovacoes. Ha apenas um administrador. |
+| `TECNICO`    | Le, cadastra e edita ativos; recebe e avalia equipamentos; cria solicitacoes. |
+| `RH`         | Gerencia funcionarios, inicia e conclui desligamentos; cria solicitacoes.     |
+| `FINANCEIRO` | Le ativos com valores e relatorios financeiros; nao altera ativos.            |
+| `CONSULTA`   | Somente leitura com mascaramento de dados pessoais.                           |
+
+Todos entram por e-mail e senha. O admin cadastra usuarios com senha provisoria; eles precisam troca-la no primeiro acesso. Sessao usa cookie `httpOnly`, `SameSite=Strict`, `Secure` em producao, expiracao e bloqueio temporario apos tentativas falhas. O header `x-technician-id` nao e aceito.
+
+## Fluxo de aprovacoes
+
+1. Um usuario com `request:create` abre uma solicitacao com justificativa e ativos.
+2. O ativo fica reservado enquanto a solicitacao estiver `PENDENTE`.
+3. Somente `request:approve` aprova ou rejeita. O administrador pode autoaprovar, e isso e auditado.
+4. A aprovacao revalida o estado e executa a movimentacao na mesma transacao.
+5. Troca movimenta o ativo antigo para avaliacao e atribui o novo; backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.
+6. Eventos de criacao, decisao, execucao, cancelamento e expiracao sao imutaveis.
+
+## Fluxo de desligamento
+
+1. RH/admin com `employee:offboard` inicia com data e motivo. O funcionario vira `em_desligamento` e os ativos vao para `PENDENTE_DEVOLUCAO` na mesma transacao.
+2. Tecnico com `asset:receive` recebe cada item, registrando estado fisico e acessorios; ele vai para `EM_AVALIACAO`.
+3. Tecnico define `BACKUP`, `EM_MANUTENCAO` ou propoe `DESATIVADO`. A ultima opcao abre aprovacao com laudo obrigatorio.
+4. RH/admin conclui somente sem ativos pendentes, sem desativacao aberta e depois de fechar ou reatribuir chamados abertos.
+
+`employee_events`, `movements` e auditoria preservam o historico. Movimentacoes sao imutaveis no banco.
+
+## Qualidade e testes
+
+```powershell
 npm run lint
 npm run format:check
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run coverage
+npm run web:typecheck
+npm run web:build
 ```
 
-Use `npm run format` para aplicar o padrão do Prettier. O pacote SheetJS CE 0.20.3 foi obtido da [distribuição oficial](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/) e mantido em `vendor/xlsx-0.20.3.tgz` para instalações reproduzíveis. SHA-256: `8DC73FC3B00203E72D176E85B50938627C7B086E607C682E8D3C22C02BB99FE8`.
+O minimo verificado e 80% de statements, linhas e funcoes de dominio/services; branches exigem 70%. A suite de integracao injeta SQLite em memoria em `createApp(db)`, sem copiar o projeto ou iniciar processo manual. O E2E Playwright executa o desligamento completo por HTTP com banco isolado.
 
-## Organização do backend
+O workflow `.github/workflows/ci.yml` roda lint, formatacao, tipos, testes, cobertura, E2E e build no Node 22 em cada push e pull request.
 
-`server.js` na raiz mantém os comandos antigos; a aplicação e o servidor ficam em
-`src/app.js` e `src/server.js`. Cada módulo de `src/modules/` separa rotas,
-controllers, services, repositories e schemas Zod. As rotas validam entradas,
-os services aplicam as regras e coordenam transações, e os repositories concentram
-o SQL. Erros conhecidos têm respostas HTTP estáveis; erros inesperados retornam
-uma mensagem genérica, sem detalhes do banco ou stack trace.
+## Docker, Nginx e HTTPS
 
-As migrations SQL numeradas ficam em `src/db/migrations/`. Na inicialização, o
-sistema aplica apenas as pendentes e registra versão e checksum em
-`schema_migrations`. Bancos criados antes desse histórico são reconhecidos sem
-apagar registros; colunas já presentes são preservadas. Faça `npm run backup`
-antes de atualizar uma instalação que contenha dados reais.
-
-O modelo novo e a planilha legada usam importadores separados em
-`src/modules/imports/`. Ambos mantêm os campos e a resposta atuais da API.
-
-## Importação inicial
-
-1. Abra [o modelo](public/modelo-importacao-inicial.xlsx) ou baixe-o na tela **Importar Excel**. O botão usa a rota `/api/templates/initial`.
-2. Na aba `Funcionarios`, preencha uma linha por pessoa. `CÓDIGO` e `NOME` são obrigatórios; use um código único por pessoa.
-3. Na aba `Ativos`, preencha uma linha por equipamento. Informe `EQUIPAMENTO`, `STATUS` e pelo menos `SERIAL` ou uma `REFERÊNCIA` individual. Preencha `REFERÊNCIA` com o número de patrimônio; ele aparece como **Patrimônio** na lista de ativos.
-4. Para `Em uso`, repita o código da pessoa em `CÓDIGO FUNCIONÁRIO`. Para `Backup`, `Manutenção` ou `Desativado`, deixe esse campo vazio. Ao desativar, informe `MOTIVO / OBSERVAÇÃO`.
-5. Salve como `.xlsx`, entre no modo Administrador e envie pela tela **Importar Excel**. O modelo novo é importado em uma única transação; uma linha inválida impede toda a gravação.
-
-A aba `Instrucoes` contém essas regras. Ela não é importada. Não inclua senhas ou credenciais na planilha.
-
-As datas de admissão e desligamento podem ficar vazias na importação. Para preenchê-las depois, entre no modo **Administrador**, abra **Funcionários** e clique em **Editar**. A data de desligamento só aparece para quem já está desligado; use **Desligamento** para mudar o status e definir o destino dos equipamentos.
-
-## Backup
+1. Copie os certificados de uma autoridade valida para `deploy/certs/fullchain.pem` e `deploy/certs/privkey.pem`.
+2. Defina `APP_ORIGIN=https://seu-dominio` no ambiente de deploy.
+3. Inicie:
 
 ```bash
-npm run backup
+docker compose up -d --build
 ```
 
-Os backups ficam em `data/backups/`.
+O `Dockerfile` e multi-stage. `app` usa o volume nomeado `inventory-data` em `/app/data`; Nginx termina TLS em 443 e redireciona 80 para HTTPS. O compose nao deve ser iniciado antes dos certificados existirem, pois Nginx precisa deles para iniciar com HTTPS.
 
-## Estrutura de dados
+## Backup e restauracao
 
-- `technicians`: técnicos e administradores.
-- `employees`: funcionários.
-- `assets`: cadastro mestre de ativos.
-- `assignments`: quem está com qual ativo e em qual período.
-- `movements`: trilha permanente de movimentações.
-- `tickets`: chamados.
-- `audit_log`: alterações relevantes.
+O backup usa `better-sqlite3.backup`, inclui o WAL, executa `integrity_check` e `foreign_key_check`, aplica retencao e, quando `BACKUP_EXTERNAL_DIR` foi definido, grava e valida uma segunda copia fora do volume do banco.
 
-## Regras importantes
+```powershell
+npm run backup
+npm run backup:verify-restore
+```
 
-1. Equipamento desativado **não é apagado**; fica com status `retired` e mantém histórico.
-2. Só existe uma atribuição aberta por equipamento.
-3. Para desligar um funcionário, todos os ativos atribuídos precisam ter um destino definido.
-4. Duplicidade por serial é bloqueada.
-5. Dados do Excel são importados por whitelist. Isso reduz risco de importar conteúdo que não pertence ao inventário.
+No Docker, o servico `backup` executa no intervalo configurado e monta `BACKUP_EXTERNAL_HOST_DIR` como segunda copia. Use uma montagem de NAS, disco criptografado ou agente de backup do provedor; uma pasta no mesmo disco nao protege contra falha desse disco.
 
-## Para colocar em produção
+Teste de restauracao recomendado, ao menos mensalmente:
 
-Para dois técnicos em uma rede interna, SQLite funciona bem. Para acesso externo, várias filiais ou crescimento de usuários, a próxima evolução recomendada é PostgreSQL, HTTPS, autenticação corporativa (Microsoft/Google/SSO), permissões por perfil e backups automáticos fora do servidor.
+1. Execute `npm run backup:verify-restore` para testar uma restauracao temporaria e a integridade.
+2. Pare a aplicacao antes de recuperar dados: `docker compose stop app`.
+3. Preserve o arquivo atual: renomeie `inventory.db` para `inventory.db.before-restore`.
+4. Copie o backup escolhido para `inventory.db` no volume `data/`.
+5. Rode `npm run backup:verify-restore <caminho-do-backup>` e inicie `docker compose start app`.
+6. Valide login, contagem de ativos e os ultimos movimentos antes de liberar usuarios.
 
-O modo “técnico sem login” atende ao requisito, mas identifica o responsável apenas pelo nome escolhido. Para auditoria forte, adicione PIN individual ou SSO.
+## Recuperacao do administrador
+
+O administrador unico nao pode ser desativado, excluido ou ter o perfil mudado pela API. Com acesso ao servidor, use:
+
+```powershell
+npm run reset-admin
+```
+
+Defina uma nova senha provisoria, entre com ela, configure novamente o TOTP e altere a senha no primeiro acesso. Registre o procedimento no controle interno de incidentes; nao compartilhe senhas ou segredos TOTP.
+
+## Operacao e privacidade
+
+Para anonimizar desligados depois do prazo configurado:
+
+```powershell
+npm run privacy:anonymize
+```
+
+Antes de atualizacoes, execute backup e valide a restauracao. Para mais detalhes de controles, matriz rota-permissao e checklist de seguranca, veja [docs/security-review.md](docs/security-review.md).

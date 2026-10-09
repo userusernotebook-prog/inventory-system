@@ -1,0 +1,47 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_ORIGIN: ${APP_ORIGIN}
+      EMPLOYEE_ANONYMIZATION_DAYS: ${EMPLOYEE_ANONYMIZATION_DAYS:-1825}
+    volumes:
+      - inventory-data:/app/data
+    expose:
+      - '3000'
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+
+  backup:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DATABASE_PATH: /app/data/inventory.db
+      BACKUP_DIR: /app/data/backups
+      BACKUP_EXTERNAL_DIR: /external-backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - inventory-data:/app/data
+      - ${BACKUP_EXTERNAL_HOST_DIR:-./external-backups}:/external-backups
+    command:
+      - /bin/sh
+      - -c
+      - 'while true; do node scripts/backup.js; sleep $$BACKUP_INTERVAL_SECONDS; done'
+
+volumes:
+  inventory-data:
