@@ -7,7 +7,12 @@ const schema = require('./dashboard.schema');
 function createDashboardRoutes(service, authService) {
   const router = Router();
   const controller = createDashboardController(service);
-  router.get('/api/dashboard', ...requirePermission(authService, 'asset:read'), controller.summary);
+  router.get(
+    '/api/dashboard',
+    ...requirePermission(authService, 'asset:read'),
+    validate(schema.query, 'query'),
+    controller.summary
+  );
   router.get(
     '/api/dashboard/report',
     ...requirePermission(authService, 'asset:read'),

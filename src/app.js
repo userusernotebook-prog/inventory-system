@@ -1,7 +1,9 @@
 const express = require('express');
 const path = require('node:path');
+const swaggerUi = require('swagger-ui-express');
 const { errorHandler } = require('./shared/middlewares/error-handler');
 const { requireAuthentication, requireCompletedOnboarding } = require('./shared/middlewares/auth');
+const { buildOpenApi } = require('./shared/openapi');
 
 const { createAuthRepository } = require('./modules/auth/auth.repository');
 const { createAuthService } = require('./modules/auth/auth.service');
@@ -100,6 +102,8 @@ app.use(express.json({ limit: '1mb' }));
 app.use(createAuthRoutes(authService));
 app.use('/api', requireAuthentication(authService));
 app.use('/api', requireCompletedOnboarding);
+app.get('/api/openapi.json', (req, res) => res.json(buildOpenApi()));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApi(), { explorer: true }));
 app.use(createAuditRoutes(auditService, authService));
 app.use(createDashboardRoutes(dashboardService, authService));
 app.use(createEmployeesRoutes(employeesService, authService));

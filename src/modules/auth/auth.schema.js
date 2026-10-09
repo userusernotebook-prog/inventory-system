@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { paginationSchema } = require('../../shared/utils/query');
 const login = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -19,7 +20,13 @@ const userUpdate = z.object({
   profile_base: z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']),
   active: z.boolean()
 });
-const id = z.object({ id: z.string() });
+const id = z.object({ id: z.coerce.number().int().positive() });
+const userList = paginationSchema.extend({
+  q: z.string().trim().max(120).optional(),
+  profile_base: z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']).optional(),
+  active: z.coerce.boolean().optional(),
+  sortBy: z.enum(['name', 'email', 'profile_base', 'last_login_at']).optional()
+});
 const totp = z.object({ code: z.string().min(6) });
 const overrides = z.object({
   overrides: z.array(
@@ -34,4 +41,4 @@ const scopes = z.object({
     z.object({ type: z.enum(['city', 'department', 'equipment_type']), value: z.string().min(1) })
   )
 });
-module.exports = { login, password, user, userUpdate, id, totp, overrides, scopes };
+module.exports = { login, password, user, userUpdate, id, userList, totp, overrides, scopes };

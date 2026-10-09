@@ -16,14 +16,14 @@ function createAssetsRoutes(service, authService) {
   router.post(
     '/api/assets',
     ...requirePermission(authService, 'asset:create'),
-    validate(schema.body, 'body'),
+    validate(schema.create, 'body'),
     controller.create
   );
   router.put(
     '/api/assets/:id',
     ...requirePermission(authService, 'asset:update'),
     validate(schema.params, 'params'),
-    validate(schema.body, 'body'),
+    validate(schema.update, 'body'),
     controller.update
   );
   return router;

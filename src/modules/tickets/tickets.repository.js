@@ -1,23 +1,59 @@
+const { likeContains } = require('../../shared/utils/query');
+
+const SORT_COLUMNS = {
+  opened_at: 'tk.opened_at',
+  priority: 'tk.priority',
+  status: 'tk.status',
+  ticket_number: 'tk.ticket_number'
+};
+
 function createTicketsRepository(db) {
   return {
-    list() {
-      return db
+    list(options, scopes = []) {
+      const where = ['1=1'];
+      const params = [];
+      if (options.q) {
+        where.push(
+          "(tk.ticket_number LIKE ? ESCAPE '\\' OR tk.description LIKE ? ESCAPE '\\' OR e.name LIKE ? ESCAPE '\\')"
+        );
+        params.push(...Array(3).fill(likeContains(options.q)));
+      }
+      for (const field of ['status', 'priority', 'employee_id']) {
+        if (options[field]) {
+          where.push(`tk.${field}=?`);
+          params.push(options[field]);
+        }
+      }
+      for (const type of ['city', 'department']) {
+        const values = scopes
+          .filter((scope) => scope.scope_type === type)
+          .map((scope) => scope.scope_value);
+        if (values.length) {
+          where.push(`lower(e.${type}) IN (${values.map(() => 'lower(?)').join(',')})`);
+          params.push(...values);
+        }
+      }
+      const joins = ` FROM tickets tk JOIN employees e ON e.id=tk.employee_id
+        LEFT JOIN assets a ON a.id=tk.asset_id LEFT JOIN users u ON u.id=tk.responsible_user_id`;
+      const clause = ` WHERE ${where.join(' AND ')}`;
+      const total = db.prepare(`SELECT count(*) count${joins}${clause}`).get(...params).count;
+      const sort = SORT_COLUMNS[options.sortBy] || 'tk.opened_at';
+      const direction = options.sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const items = db
         .prepare(
           `SELECT tk.*,e.name employee_name,e.city,e.department,a.hostname,a.serial,a.equipment_type,
-          u.name responsible_user FROM tickets tk
-          JOIN employees e ON e.id=tk.employee_id
-          LEFT JOIN assets a ON a.id=tk.asset_id
-          LEFT JOIN users u ON u.id=tk.responsible_user_id
-          ORDER BY tk.opened_at DESC LIMIT 300`
+          u.name responsible_user${joins}${clause} ORDER BY ${sort} ${direction},tk.id DESC LIMIT ? OFFSET ?`
         )
-        .all();
+        .all(...params, options.pageSize, (options.page - 1) * options.pageSize);
+      return { items, total };
     },
     create(input) {
+      const now = new Date().toISOString();
       return db
         .prepare(
           `INSERT INTO tickets
-          (ticket_number,employee_id,asset_id,type,priority,description,status,responsible_user_id)
-          VALUES(?,?,?,?,?,?,?,?)`
+          (ticket_number,employee_id,asset_id,type,priority,description,status,responsible_user_id,opened_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.ticketNumber,
@@ -27,7 +63,9 @@ function createTicketsRepository(db) {
           input.priority,
           input.description,
           'open',
-          input.responsibleUserId
+          input.responsibleUserId,
+          now,
+          now
         ).lastInsertRowid;
     }
   };

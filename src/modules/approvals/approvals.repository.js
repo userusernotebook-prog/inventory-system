@@ -72,28 +72,38 @@ function createApprovalsRepository(db) {
           .all(id)
       };
     },
-    list(filters) {
+    list(filters, requesterUserId = null) {
       let sql = `SELECT r.*,u.name requester_name FROM approval_requests r
         JOIN users u ON u.id=r.requester_user_id WHERE 1=1`;
       const params = [];
-      for (const [column, value] of Object.entries(filters)) {
-        if (value) {
+      for (const column of ['status', 'type', 'requester_user_id']) {
+        const value = filters[column];
+        if (value !== undefined) {
           sql += ` AND r.${column}=?`;
           params.push(value);
         }
       }
-      return db.prepare(`${sql} ORDER BY r.created_at DESC LIMIT 200`).all(...params);
+      if (requesterUserId) {
+        sql += ' AND r.requester_user_id=?';
+        params.push(requesterUserId);
+      }
+      const total = db.prepare(`SELECT COUNT(*) count FROM (${sql})`).get(...params).count;
+      const items = db
+        .prepare(`${sql} ORDER BY r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`)
+        .all(...params, filters.pageSize, (filters.page - 1) * filters.pageSize);
+      return { items, total };
     },
     decide(id, status, approverId, reason) {
       db.prepare(
         `UPDATE approval_requests SET status=?,approved_by_user_id=?,decision_reason=?,
-        decided_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`
-      ).run(status, approverId, reason, id);
+        decided_at=?,updated_at=? WHERE id=?`
+      ).run(status, approverId, reason, new Date().toISOString(), new Date().toISOString(), id);
     },
     cancel(id) {
-      db.prepare(
-        "UPDATE approval_requests SET status='CANCELADA',updated_at=CURRENT_TIMESTAMP WHERE id=?"
-      ).run(id);
+      db.prepare("UPDATE approval_requests SET status='CANCELADA',updated_at=? WHERE id=?").run(
+        new Date().toISOString(),
+        id
+      );
     },
     expirePending() {
       return db
@@ -103,14 +113,17 @@ function createApprovalsRepository(db) {
         .all(new Date().toISOString());
     },
     markExpired(id) {
-      db.prepare(
-        "UPDATE approval_requests SET status='EXPIRADA',updated_at=CURRENT_TIMESTAMP WHERE id=?"
-      ).run(id);
+      db.prepare("UPDATE approval_requests SET status='EXPIRADA',updated_at=? WHERE id=?").run(
+        new Date().toISOString(),
+        id
+      );
     },
     markExecuted(id) {
-      db.prepare(
-        'UPDATE approval_requests SET executed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?'
-      ).run(id);
+      db.prepare('UPDATE approval_requests SET executed_at=?,updated_at=? WHERE id=?').run(
+        new Date().toISOString(),
+        new Date().toISOString(),
+        id
+      );
     },
     notify(userId, type, title, body) {
       db.prepare('INSERT INTO user_notifications(user_id,type,title,body) VALUES(?,?,?,?)').run(

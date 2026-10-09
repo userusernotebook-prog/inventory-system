@@ -1,38 +1,40 @@
 class DomainError extends Error {
-  constructor(message, status) {
+  constructor(message, status, code, details) {
     super(message);
     this.name = this.constructor.name;
     this.status = status;
+    this.code = code;
+    this.details = details;
   }
 }
 
 class NotFoundError extends DomainError {
-  constructor(message = 'Registro não encontrado.') {
-    super(message, 404);
+  constructor(message = 'Registro não encontrado.', details) {
+    super(message, 404, 'NOT_FOUND', details);
   }
 }
 
 class ValidationError extends DomainError {
-  constructor(message = 'Dados inválidos.') {
-    super(message, 400);
+  constructor(message = 'Dados inválidos.', details) {
+    super(message, 400, 'VALIDATION_ERROR', details);
   }
 }
 
 class ConflictError extends DomainError {
-  constructor(message = 'O registro já existe.') {
-    super(message, 409);
+  constructor(message = 'O registro já existe.', details) {
+    super(message, 409, 'CONFLICT', details);
   }
 }
 
 class ForbiddenError extends DomainError {
-  constructor(message = 'Acesso não permitido.') {
-    super(message, 403);
+  constructor(message = 'Acesso não permitido.', details) {
+    super(message, 403, 'FORBIDDEN', details);
   }
 }
 
 class UnauthorizedError extends DomainError {
-  constructor(message = 'Acesso de administrador necessário.') {
-    super(message, 401);
+  constructor(message = 'Autenticação necessária.', details) {
+    super(message, 401, 'UNAUTHORIZED', details);
   }
 }
 

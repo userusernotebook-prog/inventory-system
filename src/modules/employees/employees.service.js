@@ -1,10 +1,12 @@
 const { NotFoundError, ValidationError } = require('../../shared/errors');
 const { text, optionalDate } = require('../../shared/utils/text');
+const { pageResult } = require('../../shared/utils/query');
 
 function createEmployeesService(db, repository, auditService, authService) {
   return {
-    list(query, user) {
-      return authService.filterByScope(user, repository.list(text(query)));
+    list(options, user) {
+      const result = repository.list(options, authService.scopes(user));
+      return pageResult({ ...options, ...result });
     },
     get(id, user) {
       const employee = repository.findById(id);
@@ -16,8 +18,12 @@ function createEmployeesService(db, repository, auditService, authService) {
       if (!text(body.name)) throw new ValidationError('Nome é obrigatório.');
       authService.assertScope(technician, body);
       return db.transaction(() => {
+        const code = text(body.code);
+        if (code && repository.findCodeDuplicate(code)) {
+          throw new ValidationError('Código de funcionário já cadastrado.', { field: 'code' });
+        }
         const id = repository.create({
-          code: text(body.code),
+          code,
           name: text(body.name),
           email: text(body.email),
           city: text(body.city),

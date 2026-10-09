@@ -42,7 +42,7 @@ function createAuthController(service) {
       res.json(await service.confirmTotp(req.user, req.validated.body.code));
     },
     listUsers(req, res) {
-      res.json(service.listUsers());
+      res.json(service.listUsers(req.validated.query));
     },
     async createUser(req, res) {
       res.json(await service.createUser(req.validated.body, req.user));

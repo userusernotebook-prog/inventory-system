@@ -5,6 +5,7 @@ const {
   ValidationError
 } = require('../../shared/errors');
 const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
+const { pageResult } = require('../../shared/utils/query');
 
 const TYPES = Object.freeze({
   EXCHANGE: 'TROCA_EQUIPAMENTO',
@@ -197,15 +198,18 @@ function createApprovalsService(
     },
     list(filters, user) {
       db.transaction(expireDueRequests)();
+      const page = Number(filters.page) || 1;
+      const pageSize = Number(filters.pageSize) || 25;
       const values = {
         status: filters.status,
         type: filters.type,
         requester_user_id: filters.requester_user_id
       };
-      const rows = repository.list(values);
-      return user.profile_base === 'ADMIN'
-        ? rows
-        : rows.filter((row) => row.requester_user_id === user.id);
+      const result = repository.list(
+        { ...values, page, pageSize },
+        user.profile_base === 'ADMIN' ? null : user.id
+      );
+      return pageResult({ page, pageSize, ...result });
     },
     get(id, user) {
       db.transaction(expireDueRequests)();

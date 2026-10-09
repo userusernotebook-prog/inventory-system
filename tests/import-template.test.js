@@ -206,7 +206,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     assert.equal(result.status, 200, JSON.stringify(result.data));
     assert.equal(result.data.employees, 1);
     assert.equal(result.data.assets, 3);
-    const importAudit = (await api('/api/admin/audit')).data.find(
+    const importAudit = (await api('/api/admin/audit')).data.items.find(
       (entry) => entry.action === 'import'
     );
     assert.deepEqual(JSON.parse(importAudit.details).after, {
@@ -215,12 +215,12 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
       skipped: 0,
       filename: 'teste.xlsx'
     });
-    const people = (await api('/api/employees')).data;
-    const assets = (await api('/api/assets')).data;
+    const people = (await api('/api/employees')).data.items;
+    const assets = (await api('/api/assets')).data.items;
     assert.equal(people.length, 1);
     assert.equal(people[0].hire_date, null);
     assert.equal(people[0].offboarded_at, null);
-    const byPatrimony = (await api('/api/assets?q=REF-F001-2')).data;
+    const byPatrimony = (await api('/api/assets?q=REF-F001-2')).data.items;
     assert.equal(byPatrimony.length, 1);
     assert.equal(byPatrimony[0].reference, 'REF-F001-2');
     const changed = await api(
@@ -294,14 +294,14 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     assert.equal((await upload(valid)).status, 400);
     const rejected = await upload(invalid);
     assert.equal(rejected.status, 400);
-    assert.match(rejected.data.error, /MOTIVO/);
-    assert.equal((await api('/api/employees')).data.length, 1);
-    assert.equal((await api('/api/assets')).data.length, 3);
+    assert.match(rejected.data.error.message, /MOTIVO/);
+    assert.equal((await api('/api/employees')).data.total, 1);
+    assert.equal((await api('/api/assets')).data.total, 3);
 
     const dated = await upload(filledWorkbook({ code: 'F003', hireDate: true }));
     assert.equal(dated.status, 200, JSON.stringify(dated.data));
     assert.equal(
-      (await api('/api/employees')).data.find((person) => person.code === 'F003').hire_date,
+      (await api('/api/employees')).data.items.find((person) => person.code === 'F003').hire_date,
       '2026-10-01'
     );
 
@@ -311,7 +311,8 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     assert.equal(legacy.data.assets, 1);
     assert.equal(legacy.data.tickets, 1);
     assert.equal(
-      (await api('/api/tickets')).data.find((item) => item.ticket_number === 'CH-LEGADO').status,
+      (await api('/api/tickets')).data.items.find((item) => item.ticket_number === 'CH-LEGADO')
+        .status,
       'closed'
     );
   } finally {

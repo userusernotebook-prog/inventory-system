@@ -6,7 +6,10 @@ function createAssignmentsRepository(db) {
         .get(assetId);
     },
     close(id) {
-      db.prepare('UPDATE assignments SET returned_at=CURRENT_TIMESTAMP WHERE id=?').run(id);
+      db.prepare('UPDATE assignments SET returned_at=? WHERE id=?').run(
+        new Date().toISOString(),
+        id
+      );
     },
     create(assetId, employeeId, responsibleUserId) {
       db.prepare(

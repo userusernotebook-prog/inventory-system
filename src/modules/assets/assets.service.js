@@ -1,11 +1,13 @@
 const { ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { ASSET_STATES } = require('./domain/asset-state-machine');
+const { pageResult } = require('../../shared/utils/query');
 
 function createAssetsService(db, repository, auditService, authService) {
   return {
-    list(query, status, user) {
-      return authService.filterByScope(user, repository.list(text(query), text(status)));
+    list(options, user) {
+      const result = repository.list(options, authService.scopes(user));
+      return pageResult({ ...options, ...result });
     },
     create(body, technician) {
       if (!text(body.equipment_type)) {
@@ -73,7 +75,7 @@ function createAssetsService(db, repository, auditService, authService) {
         'city',
         'location'
       ]) {
-        input[field] = text(body[field]);
+        input[field] = Object.hasOwn(body, field) ? text(body[field]) : current[field];
       }
       authService.assertScope(user, input);
       db.transaction(() => {

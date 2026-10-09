@@ -1,10 +1,12 @@
 const { ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
+const { pageResult } = require('../../shared/utils/query');
 
 function createTicketsService(db, repository, auditService, employeesRepository, authService) {
   return {
-    list(user) {
-      return authService.filterByScope(user, repository.list());
+    list(options, user) {
+      const result = repository.list(options, authService.scopes(user));
+      return pageResult({ ...options, ...result });
     },
     create(body, technician) {
       if (!Number(body.employee_id) || !text(body.description)) {

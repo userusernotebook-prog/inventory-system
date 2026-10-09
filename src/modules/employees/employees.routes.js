@@ -22,7 +22,7 @@ function createEmployeesRoutes(service, authService) {
   router.post(
     '/api/employees',
     ...requirePermission(authService, 'employee:create'),
-    validate(schema.body, 'body'),
+    validate(schema.create, 'body'),
     controller.create
   );
   router.put(

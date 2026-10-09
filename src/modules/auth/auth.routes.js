@@ -34,7 +34,7 @@ function createAuthRoutes(service) {
     validate(schema.totp, 'body'),
     controller.confirmTotp
   );
-  router.get('/api/users', ...manage, controller.listUsers);
+  router.get('/api/users', ...manage, validate(schema.userList, 'query'), controller.listUsers);
   router.post('/api/users', ...manage, validate(schema.user, 'body'), controller.createUser);
   router.put(
     '/api/users/:id',

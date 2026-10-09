@@ -23,6 +23,7 @@
     "express-rate-limit": "^8.7.1",
     "multer": "^2.0.0",
     "otplib": "^13.5.0",
+    "swagger-ui-express": "^5.0.1",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
   },

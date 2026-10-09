@@ -1,3 +1,5 @@
+const { pageResult } = require('../../shared/utils/query');
+
 function createAuditService(repository) {
   return {
     log(actor, action, entityType, entityId, details) {
@@ -13,7 +15,7 @@ function createAuditService(repository) {
         user.id
       );
     },
-    listRecent: () => repository.listRecent()
+    list: (options) => pageResult({ ...options, ...repository.list(options) })
   };
 }
 

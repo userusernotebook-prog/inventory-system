@@ -2,14 +2,15 @@ function createOffboardingRepository(db) {
   return {
     start(employeeId, date, reason) {
       db.prepare(
-        `UPDATE employees SET status='em_desligamento',offboarding_reason=?,offboarding_started_at=CURRENT_TIMESTAMP,
-        offboarded_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`
-      ).run(reason, date, employeeId);
+        `UPDATE employees SET status='em_desligamento',offboarding_reason=?,offboarding_started_at=?,
+        offboarded_at=?,updated_at=? WHERE id=?`
+      ).run(reason, new Date().toISOString(), date, new Date().toISOString(), employeeId);
     },
     complete(employeeId) {
-      db.prepare(
-        "UPDATE employees SET status='desligado',updated_at=CURRENT_TIMESTAMP WHERE id=?"
-      ).run(employeeId);
+      db.prepare("UPDATE employees SET status='desligado',updated_at=? WHERE id=?").run(
+        new Date().toISOString(),
+        employeeId
+      );
     },
     event(employeeId, type, actorId, details = {}) {
       db.prepare(
@@ -59,13 +60,16 @@ function createOffboardingRepository(db) {
         .all(employeeId);
     },
     closeTicket(id) {
-      db.prepare(
-        "UPDATE tickets SET status='closed',closed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?"
-      ).run(id);
+      db.prepare("UPDATE tickets SET status='closed',closed_at=?,updated_at=? WHERE id=?").run(
+        new Date().toISOString(),
+        new Date().toISOString(),
+        id
+      );
     },
     reassignTicket(id, employeeId) {
-      db.prepare('UPDATE tickets SET employee_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(
+      db.prepare('UPDATE tickets SET employee_id=?,updated_at=? WHERE id=?').run(
         employeeId,
+        new Date().toISOString(),
         id
       );
     },

@@ -20,7 +20,7 @@ async function api(url, opt = {}) {
   opt.credentials = 'same-origin';
   const r = await fetch(url, opt);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || 'Erro');
+  if (!r.ok) throw new Error(d.error?.message || d.error || 'Erro');
   return d;
 }
 function hasPermission(permission) {
@@ -65,16 +65,24 @@ document.querySelectorAll('.nav').forEach(
       )();
     })
 );
-const fmtDate = (s) => (s ? new Date(s).toLocaleString('pt-BR') : '');
+const fmtDate = (s) =>
+  s
+    ? new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        dateStyle: 'short',
+        timeStyle: 'medium'
+      }).format(new Date(s))
+    : '';
 function smallTable(rows, cols) {
   return `<table><thead><tr>${cols.map((c) => `<th>${esc(c.replaceAll('_', ' '))}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${c.includes('at') ? esc(fmtDate(r[c])) : esc(r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 async function employees() {
-  const rows = await api('/api/employees');
+  const result = await api('/api/employees');
+  const rows = result.items;
   app.innerHTML = `<h1>Funcionários</h1><div class=toolbar><button id=newEmp>Novo funcionário</button><input id=empSearch placeholder='Buscar nome, e-mail ou departamento'></div><div id=empList>${employeeTable(rows)}</div><div id=empForm></div>`;
   empSearch.oninput = async () =>
     (empList.innerHTML = employeeTable(
-      await api('/api/employees?q=' + encodeURIComponent(empSearch.value))
+      (await api('/api/employees?q=' + encodeURIComponent(empSearch.value))).items
     ));
   newEmp.onclick = () => showEmpForm();
   empList.onclick = async (event) => {
@@ -167,13 +175,16 @@ async function offboard(id, name) {
   };
 }
 async function assets() {
-  const rows = await api('/api/assets');
+  const result = await api('/api/assets');
+  const rows = result.items;
   app.innerHTML = `<h1>Ativos</h1><div class=toolbar><button id=newAsset>Novo ativo</button><input id=assetSearch placeholder='Funcionário, hostname, modelo, serial ou patrimônio'><select id=assetStatus><option value=''>Todos</option><option value=DISPONIVEL>Disponível</option><option value=EM_USO>Em uso</option><option value=PENDENTE_DEVOLUCAO>Pendente de devolução</option><option value=EM_AVALIACAO>Em avaliação</option><option value=BACKUP>Backup</option><option value=EM_MANUTENCAO>Manutenção</option><option value=DESATIVADO>Desativados</option></select></div><div id=assetList>${assetTable(rows)}</div><div id=assetForm></div>`;
   const refresh = async () =>
     (assetList.innerHTML = assetTable(
-      await api(
-        `/api/assets?q=${encodeURIComponent(assetSearch.value)}&status=${assetStatus.value}`
-      )
+      (
+        await api(
+          `/api/assets?q=${encodeURIComponent(assetSearch.value)}&status=${assetStatus.value}`
+        )
+      ).items
     ));
   assetSearch.oninput = refresh;
   assetStatus.onchange = refresh;
@@ -224,8 +235,8 @@ async function historyAsset(id) {
   app.innerHTML = `<h1>Histórico do equipamento</h1><button class=ghost onclick='assets()'>Voltar</button><section class='panel history' style='margin-top:12px'>${smallTable(h, ['occurred_at', 'movement_type', 'from_status', 'to_status', 'employee_from', 'employee_to', 'responsible_user', 'reason', 'technical_report'])}</section>`;
 }
 async function move() {
-  const as = await api('/api/assets');
-  const es = await api('/api/employees');
+  const as = (await api('/api/assets?pageSize=100')).items;
+  const es = (await api('/api/employees?pageSize=100')).items;
   app.innerHTML = `<h1>Movimentar equipamento</h1><section class=panel><div class=form-grid><select id=ma><option value=''>Selecione o ativo</option>${as
     .filter((a) => a.status !== 'DESATIVADO')
     .map(
@@ -260,7 +271,12 @@ async function move() {
   };
 }
 async function tickets() {
-  const [rows, es] = await Promise.all([api('/api/tickets'), api('/api/employees')]);
+  const [ticketResult, employeeResult] = await Promise.all([
+    api('/api/tickets'),
+    api('/api/employees?pageSize=100')
+  ]);
+  const rows = ticketResult.items || ticketResult;
+  const es = employeeResult.items;
   app.innerHTML = `<h1>Chamados</h1><section class=panel><h2>Novo chamado</h2><div class=form-grid><select id=te><option value=''>Funcionário</option>${es
     .filter((e) => e.status === 'ativo')
     .map((e) => `<option value='${e.id}'>${esc(e.name)}</option>`)
@@ -312,7 +328,7 @@ function importPage() {
   };
 }
 async function audit() {
-  const rows = await api('/api/admin/audit');
+  const rows = (await api('/api/admin/audit')).items;
   app.innerHTML = `<h1>Auditoria</h1><p class=muted>Registro das alterações administrativas e operacionais.</p>${smallTable(rows, ['created_at', 'actor', 'action', 'entity_type', 'entity_id', 'details'])}`;
 }
 function showOnboarding(loginResult) {

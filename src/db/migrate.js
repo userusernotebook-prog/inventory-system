@@ -9,6 +9,7 @@ const legacyColumns = new Map([
   [4, 'hire_date']
 ]);
 const structuralMigrations = new Set([5, 6, 8]);
+const migrationRequirements = new Map([[9, [6, 7, 8]]]);
 
 function applyStructuralMigration(db, sql, record) {
   db.pragma('foreign_keys = OFF');
@@ -64,6 +65,8 @@ function migrate(db) {
 
   for (const file of files) {
     const version = Number(file.slice(0, 3));
+    const requirements = migrationRequirements.get(version) || [];
+    if (requirements.some((required) => !knownVersions.has(required))) continue;
     const source = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
     const sql = source.replace(/\r\n/g, '\n');
     const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');

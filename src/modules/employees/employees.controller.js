@@ -1,7 +1,7 @@
 function createEmployeesController(service) {
   return {
     list(req, res) {
-      res.json(service.list(req.validated.query.q, req.user));
+      res.json(service.list(req.validated.query, req.user));
     },
     get(req, res) {
       res.json(service.get(req.validated.params.id, req.user));

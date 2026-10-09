@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const argon2 = require('argon2');
 const { generateSecret, generateURI, verify } = require('otplib');
 const { ForbiddenError, UnauthorizedError, ValidationError } = require('../../shared/errors');
+const { pageResult } = require('../../shared/utils/query');
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -204,7 +205,7 @@ function createAuthService(repository, auditService) {
       auditService.logUser(actor, 'scope', 'user', id, { after: rows });
       return { ok: true };
     },
-    listUsers: () => repository.listUsers(),
+    listUsers: (options) => pageResult({ ...options, ...repository.listUsers(options) }),
     findUser: (id) => repository.findById(id)
   };
 }
