@@ -173,6 +173,15 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     assert.equal(result.status, 200, JSON.stringify(result.data));
     assert.equal(result.data.employees, 1);
     assert.equal(result.data.assets, 3);
+    const importAudit = (await api('/api/admin/audit', 'GET', undefined, token)).data.find(
+      (entry) => entry.action === 'import'
+    );
+    assert.deepEqual(JSON.parse(importAudit.details), {
+      employees: 1,
+      assets: 3,
+      skipped: 0,
+      filename: 'teste.xlsx'
+    });
     const people = (await api('/api/employees')).data;
     const assets = (await api('/api/assets')).data;
     assert.equal(people.length, 1);

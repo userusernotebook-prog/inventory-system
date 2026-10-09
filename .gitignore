@@ -6,6 +6,7 @@
 /.import-test-*/
 /.offboard-test-*/
 /.migration-test-*/
+/.contract-test-*/
 /.artifact-template/
 /public/*.ndjson
 /public/~$*

@@ -19,7 +19,8 @@ module.exports = [
       '.artifact-template/**',
       '.import-test-*/**',
       '.offboard-test-*/**',
-      '.migration-test-*/**'
+      '.migration-test-*/**',
+      '.contract-test-*/**'
     ]
   },
   {

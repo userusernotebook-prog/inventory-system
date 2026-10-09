@@ -45,6 +45,24 @@ npm run format:check
 
 Use `npm run format` para aplicar o padrão do Prettier. O pacote SheetJS CE 0.20.3 foi obtido da [distribuição oficial](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/) e mantido em `vendor/xlsx-0.20.3.tgz` para instalações reproduzíveis. SHA-256: `8DC73FC3B00203E72D176E85B50938627C7B086E607C682E8D3C22C02BB99FE8`.
 
+## Organização do backend
+
+`server.js` na raiz mantém os comandos antigos; a aplicação e o servidor ficam em
+`src/app.js` e `src/server.js`. Cada módulo de `src/modules/` separa rotas,
+controllers, services, repositories e schemas Zod. As rotas validam entradas,
+os services aplicam as regras e coordenam transações, e os repositories concentram
+o SQL. Erros conhecidos têm respostas HTTP estáveis; erros inesperados retornam
+uma mensagem genérica, sem detalhes do banco ou stack trace.
+
+As migrations SQL numeradas ficam em `src/db/migrations/`. Na inicialização, o
+sistema aplica apenas as pendentes e registra versão e checksum em
+`schema_migrations`. Bancos criados antes desse histórico são reconhecidos sem
+apagar registros; colunas já presentes são preservadas. Faça `npm run backup`
+antes de atualizar uma instalação que contenha dados reais.
+
+O modelo novo e a planilha legada usam importadores separados em
+`src/modules/imports/`. Ambos mantêm os campos e a resposta atuais da API.
+
 ## Importação inicial
 
 1. Abra [o modelo](public/modelo-importacao-inicial.xlsx) ou baixe-o na tela **Importar Excel**. O botão usa a rota `/api/templates/initial`.
