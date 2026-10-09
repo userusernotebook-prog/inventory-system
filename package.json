@@ -1,0 +1,28 @@
+{
+  "name": "inventario-ativos-interno",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "backup": "node scripts/backup.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "format": "prettier --write \"*.{js,cjs}\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json",
+    "format:check": "prettier --check \"*.{js,cjs}\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "18.0.6",
+    "express": "^5.1.0",
+    "multer": "^2.0.0",
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.9"
+  }
+}

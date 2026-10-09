@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Gestão de Ativos</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="techModal" class="modal">
+      <div class="modal-card">
+        <h2>Quem está realizando a movimentação?</h2>
+        <p>Selecione o técnico. Não é necessário login para operação diária.</p>
+        <select id="techSelect"></select
+        ><button id="chooseTech">Entrar no sistema</button>
+      </div>
+    </div>
+    <header>
+      <div><strong>Gestão de Ativos</strong><span id="actorBadge"></span></div>
+      <button class="ghost" id="adminBtn">Administrador</button>
+    </header>
+    <div class="layout">
+      <aside>
+        <button data-page="dashboard" class="nav active">Dashboard</button
+        ><button data-page="employees" class="nav">Funcionários</button
+        ><button data-page="assets" class="nav">Ativos</button
+        ><button data-page="move" class="nav">Movimentar</button
+        ><button data-page="tickets" class="nav">Chamados</button
+        ><button data-page="import" class="nav">Importar Excel</button
+        ><button data-page="audit" class="nav admin-only hidden">Auditoria</button>
+      </aside>
+      <main id="app"></main>
+    </div>
+    <div id="toast"></div>
+    <script src="/dashboard.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

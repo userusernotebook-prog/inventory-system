@@ -1,0 +1,12 @@
+/node_modules/
+/data/
+/.env
+/.env.*
+!/.env.example
+/.import-test-*/
+/.offboard-test-*/
+/.artifact-template/
+/public/*.ndjson
+/public/~$*
+# Planilha legada com linhas preenchidas; manter apenas localmente.
+/public/modelo-importacao.xlsx
