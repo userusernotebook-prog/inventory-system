@@ -5,7 +5,7 @@ const {
   AssetStateTransitionError,
   TRANSITIONS,
   validateTransition
-} = require('../src/modules/assets/domain/asset-state-machine');
+} = require('../../../src/modules/assets/domain/asset-state-machine');
 
 function validInput(fromStatus, rule) {
   return {

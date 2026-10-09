@@ -46,103 +46,113 @@ const { createOffboardingService } = require('./modules/offboarding/offboarding.
 const { createOffboardingRoutes } = require('./modules/offboarding/offboarding.routes');
 
 // No Node 24/Windows, carregue os módulos JS antes de abrir o addon SQLite.
-const db = require('./db/connection');
-const auditService = createAuditService(createAuditRepository(db));
-const authService = createAuthService(createAuthRepository(db), auditService);
-const employeesRepository = createEmployeesRepository(db);
-const assetsRepository = createAssetsRepository(db);
-const assignmentsRepository = createAssignmentsRepository(db);
-const movementsRepository = createMovementsRepository(db);
+function createApp(db) {
+  if (!db) throw new Error('A conexao com o banco de dados e obrigatoria.');
 
-const employeesService = createEmployeesService(db, employeesRepository, auditService, authService);
-const assetsService = createAssetsService(db, assetsRepository, auditService, authService);
-const movementsService = createMovementsService(
-  db,
-  assetsRepository,
-  employeesRepository,
-  assignmentsRepository,
-  movementsRepository,
-  auditService,
-  authService
-);
-const assignmentsService = createAssignmentsService(
-  db,
-  assignmentsRepository,
-  employeesRepository,
-  movementsService,
-  auditService,
-  authService
-);
-const ticketsService = createTicketsService(
-  db,
-  createTicketsRepository(db),
-  auditService,
-  employeesRepository,
-  authService
-);
-const importsService = createImportsService(db, createImportsRepository(db), auditService);
-const dashboardService = createDashboardService(createDashboardRepository(db));
-const approvalsService = createApprovalsService(
-  db,
-  createApprovalsRepository(db),
-  assetsRepository,
-  employeesRepository,
-  movementsService,
-  auditService,
-  authService
-);
-const offboardingService = createOffboardingService(
-  db,
-  createOffboardingRepository(db),
-  employeesRepository,
-  assetsRepository,
-  assignmentsRepository,
-  movementsService,
-  approvalsService,
-  auditService,
-  authService
-);
+  const auditService = createAuditService(createAuditRepository(db));
+  const authService = createAuthService(createAuthRepository(db), auditService);
+  const employeesRepository = createEmployeesRepository(db);
+  const assetsRepository = createAssetsRepository(db);
+  const assignmentsRepository = createAssignmentsRepository(db);
+  const movementsRepository = createMovementsRepository(db);
 
-const app = express();
-app.disable('x-powered-by');
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:']
-      }
-    },
-    crossOriginEmbedderPolicy: false
-  })
-);
-app.use(requestSecurity);
-app.use(express.json({ limit: '1mb' }));
-app.use(createAuthRoutes(authService));
-app.use('/api', requireAuthentication(authService));
-app.use('/api', requireCompletedOnboarding);
-app.get('/api/openapi.json', ...requirePermission(authService, 'audit:read'), (req, res) =>
-  res.json(buildOpenApi())
-);
-app.use(
-  '/api/docs',
-  ...requirePermission(authService, 'audit:read'),
-  swaggerUi.serve,
-  swaggerUi.setup(buildOpenApi(), { explorer: true })
-);
-app.use(createAuditRoutes(auditService, authService));
-app.use(createDashboardRoutes(dashboardService, authService));
-app.use(createEmployeesRoutes(employeesService, authService));
-app.use(createAssetsRoutes(assetsService, authService));
-app.use(createMovementsRoutes(movementsService, authService));
-app.use(createApprovalsRoutes(approvalsService, authService));
-app.use(createOffboardingRoutes(offboardingService, authService));
-app.use(createAssignmentsRoutes(assignmentsService, authService));
-app.use(createTicketsRoutes(ticketsService, authService));
-app.use(createImportsRoutes(importsService, authService));
-app.use(express.static(path.resolve(__dirname, '..', 'public')));
-app.use(errorHandler);
+  const employeesService = createEmployeesService(
+    db,
+    employeesRepository,
+    auditService,
+    authService
+  );
+  const assetsService = createAssetsService(db, assetsRepository, auditService, authService);
+  const movementsService = createMovementsService(
+    db,
+    assetsRepository,
+    employeesRepository,
+    assignmentsRepository,
+    movementsRepository,
+    auditService,
+    authService
+  );
+  const assignmentsService = createAssignmentsService(
+    db,
+    assignmentsRepository,
+    employeesRepository,
+    movementsService,
+    auditService,
+    authService
+  );
+  const ticketsService = createTicketsService(
+    db,
+    createTicketsRepository(db),
+    auditService,
+    employeesRepository,
+    authService
+  );
+  const importsService = createImportsService(db, createImportsRepository(db), auditService);
+  const dashboardService = createDashboardService(createDashboardRepository(db));
+  const approvalsService = createApprovalsService(
+    db,
+    createApprovalsRepository(db),
+    assetsRepository,
+    employeesRepository,
+    movementsService,
+    auditService,
+    authService
+  );
+  const offboardingService = createOffboardingService(
+    db,
+    createOffboardingRepository(db),
+    employeesRepository,
+    assetsRepository,
+    assignmentsRepository,
+    movementsService,
+    approvalsService,
+    auditService,
+    authService
+  );
 
-module.exports = app;
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:']
+        }
+      },
+      crossOriginEmbedderPolicy: false
+    })
+  );
+  app.use(requestSecurity);
+  app.use(express.json({ limit: '1mb' }));
+  app.use(createAuthRoutes(authService));
+  app.use('/api', requireAuthentication(authService));
+  app.use('/api', requireCompletedOnboarding);
+  app.get('/api/openapi.json', ...requirePermission(authService, 'audit:read'), (req, res) =>
+    res.json(buildOpenApi())
+  );
+  app.use(
+    '/api/docs',
+    ...requirePermission(authService, 'audit:read'),
+    swaggerUi.serve,
+    swaggerUi.setup(buildOpenApi(), { explorer: true })
+  );
+  app.use(createAuditRoutes(auditService, authService));
+  app.use(createDashboardRoutes(dashboardService, authService));
+  app.use(createEmployeesRoutes(employeesService, authService));
+  app.use(createAssetsRoutes(assetsService, authService));
+  app.use(createMovementsRoutes(movementsService, authService));
+  app.use(createApprovalsRoutes(approvalsService, authService));
+  app.use(createOffboardingRoutes(offboardingService, authService));
+  app.use(createAssignmentsRoutes(assignmentsService, authService));
+  app.use(createTicketsRoutes(ticketsService, authService));
+  app.use(createImportsRoutes(importsService, authService));
+  app.use(express.static(path.resolve(__dirname, '..', 'public')));
+  app.use(errorHandler);
+
+  return app;
+}
+
+module.exports = { createApp };

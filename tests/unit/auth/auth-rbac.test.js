@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const argon2 = require('argon2');
 const { generate } = require('otplib');
-const { migrate } = require('../src/db/migrate');
-const { createAuthRepository } = require('../src/modules/auth/auth.repository');
-const { createAuthService } = require('../src/modules/auth/auth.service');
+const { migrate } = require('../../../src/db/migrate');
+const { createAuthRepository } = require('../../../src/modules/auth/auth.repository');
+const { createAuthService } = require('../../../src/modules/auth/auth.service');
 
 async function makeContext() {
   const db = new Database(':memory:');

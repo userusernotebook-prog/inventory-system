@@ -1,23 +1,31 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
-const { migrate } = require('../src/db/migrate');
-const { createAuthRepository } = require('../src/modules/auth/auth.repository');
-const { createAuthService } = require('../src/modules/auth/auth.service');
-const { createAssetsRepository } = require('../src/modules/assets/assets.repository');
-const { createEmployeesRepository } = require('../src/modules/employees/employees.repository');
+const { migrate } = require('../../../src/db/migrate');
+const { createAuthRepository } = require('../../../src/modules/auth/auth.repository');
+const { createAuthService } = require('../../../src/modules/auth/auth.service');
+const { createAssetsRepository } = require('../../../src/modules/assets/assets.repository');
+const {
+  createEmployeesRepository
+} = require('../../../src/modules/employees/employees.repository');
 const {
   createAssignmentsRepository
-} = require('../src/modules/assignments/assignments.repository');
-const { createMovementsRepository } = require('../src/modules/movements/movements.repository');
-const { createMovementsService } = require('../src/modules/movements/movements.service');
-const { createApprovalsRepository } = require('../src/modules/approvals/approvals.repository');
-const { createApprovalsService } = require('../src/modules/approvals/approvals.service');
+} = require('../../../src/modules/assignments/assignments.repository');
+const {
+  createMovementsRepository
+} = require('../../../src/modules/movements/movements.repository');
+const { createMovementsService } = require('../../../src/modules/movements/movements.service');
+const {
+  createApprovalsRepository
+} = require('../../../src/modules/approvals/approvals.repository');
+const { createApprovalsService } = require('../../../src/modules/approvals/approvals.service');
 const {
   createOffboardingRepository
-} = require('../src/modules/offboarding/offboarding.repository');
-const { createOffboardingService } = require('../src/modules/offboarding/offboarding.service');
-const { ASSET_STATES } = require('../src/modules/assets/domain/asset-state-machine');
+} = require('../../../src/modules/offboarding/offboarding.repository');
+const {
+  createOffboardingService
+} = require('../../../src/modules/offboarding/offboarding.service');
+const { ASSET_STATES } = require('../../../src/modules/assets/domain/asset-state-machine');
 
 function setup() {
   const db = new Database(':memory:');

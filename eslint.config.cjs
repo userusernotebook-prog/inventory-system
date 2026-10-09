@@ -21,11 +21,14 @@ module.exports = [
       '.offboard-test-*/**',
       '.migration-test-*/**',
       '.contract-test-*/**',
-      'public/assets/**'
+      'public/assets/**',
+      'coverage/**',
+      'playwright-report/**',
+      'test-results/**'
     ]
   },
   {
-    files: ['*.js', '*.cjs', 'src/**/*.js', 'scripts/**/*.js', 'tests/**/*.js'],
+    files: ['*.js', '*.cjs', 'src/**/*.js', 'scripts/**/*.js', 'tests/**/*.js', 'e2e/**/*.js'],
     languageOptions: { globals: globals.node, sourceType: 'commonjs' },
     rules: eslint.configs.recommended.rules
   },

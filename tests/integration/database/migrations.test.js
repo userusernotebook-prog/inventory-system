@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const Database = require('better-sqlite3');
 
-const projectDir = path.resolve(__dirname, '..');
+const projectDir = path.resolve(__dirname, '..', '..', '..');
 const initSql = fs.readFileSync(
   path.join(projectDir, 'src', 'db', 'migrations', '001_init.sql'),
   'utf8'

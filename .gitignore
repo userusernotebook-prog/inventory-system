@@ -12,3 +12,6 @@
 /public/~$*
 # Planilha legada com linhas preenchidas; manter apenas localmente.
 /public/modelo-importacao.xlsx
+/coverage/
+/playwright-report/
+/test-results/

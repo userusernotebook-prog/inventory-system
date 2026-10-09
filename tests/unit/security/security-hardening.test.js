@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const employeeSchema = require('../src/modules/employees/employees.schema');
-const approvalSchema = require('../src/modules/approvals/approvals.schema');
-const { requestSecurity } = require('../src/shared/middlewares/security');
-const { createAssetsService } = require('../src/modules/assets/assets.service');
-const { ForbiddenError } = require('../src/shared/errors');
+const employeeSchema = require('../../../src/modules/employees/employees.schema');
+const approvalSchema = require('../../../src/modules/approvals/approvals.schema');
+const { requestSecurity } = require('../../../src/shared/middlewares/security');
+const { createAssetsService } = require('../../../src/modules/assets/assets.service');
+const { ForbiddenError } = require('../../../src/shared/errors');
 
 function runRequestSecurity(headers = {}) {
   let nextError;
@@ -60,7 +60,7 @@ test('protege detalhe do ativo contra IDOR ao aplicar alcance no serviço', () =
 
 test('rotas críticas de aprovação exigem permissão granular, sem apenas autenticação', () => {
   const source = require('node:fs').readFileSync(
-    require('node:path').resolve(__dirname, '../src/modules/approvals/approvals.routes.js'),
+    require('node:path').resolve(__dirname, '../../../src/modules/approvals/approvals.routes.js'),
     'utf8'
   );
   assert.match(source, /\/cancel',[\s\S]*requirePermission\(authService, 'request:create'\)/);
