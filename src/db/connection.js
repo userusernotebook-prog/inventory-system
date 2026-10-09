@@ -3,9 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { migrate } = require('./migrate');
 
-const dataDir = path.resolve(__dirname, '..', '..', 'data');
+const databasePath =
+  process.env.DATABASE_PATH || path.resolve(__dirname, '..', '..', 'data', 'inventory.db');
+const dataDir = path.dirname(databasePath);
 fs.mkdirSync(dataDir, { recursive: true });
-const db = new Database(path.join(dataDir, 'inventory.db'));
+const db = new Database(databasePath);
 
 try {
   db.pragma('journal_mode = WAL');

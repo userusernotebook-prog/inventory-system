@@ -12,13 +12,14 @@ Copy-Item .env.example .env
 npm start
 ```
 
-Abra `http://localhost:3000`. O primeiro administrador e criado somente no servidor:
+Abra `http://localhost:3000`. O primeiro administrador e criado somente no servidor. Nome e e-mail podem ser passados na linha de comando:
 
 ```powershell
 npm run create-admin
+# ou: npm run create-admin -- "Nome da pessoa" admin@empresa.com
 ```
 
-O comando pede os dados e configura uma senha segura. O administrador deve registrar o TOTP no primeiro login. Para desenvolvimento do frontend separado:
+O comando pede a senha provisoria de forma oculta e pede confirmacao; ela nunca e aceita como argumento. Em automacoes sem terminal, defina `ADMIN_NAME`, `ADMIN_EMAIL` e exatamente uma fonte de senha: `ADMIN_PASSWORD` ou `ADMIN_PASSWORD_FILE`, cujo conteudo e lido localmente. O administrador deve registrar o TOTP no primeiro login. Para desenvolvimento do frontend separado:
 
 ```powershell
 npm run web:dev
@@ -37,8 +38,12 @@ npm run web:dev
 | `BACKUP_EXTERNAL_DIR`         | Montagem externa para segunda copia             | opcional                |
 | `BACKUP_RETENTION_DAYS`       | Retencao dos backups em dias                    | `30`                    |
 | `BACKUP_INTERVAL_SECONDS`     | Intervalo do servico Docker de backup           | `86400`                 |
+| `ADMIN_PASSWORD`              | Senha provisoria apenas para automacao          | sem padrao              |
+| `ADMIN_PASSWORD_FILE`         | Arquivo local com senha para automacao          | sem padrao              |
 
 `APP_ORIGIN` deve ser a URL final, por exemplo `https://inventario.empresa.com`. Nunca versione `.env`, certificados ou `data/`.
+
+`ADMIN_PASSWORD` e `ADMIN_PASSWORD_FILE` sao usados somente por `create-admin` e `reset-admin`; eles nao devem permanecer em `.env`. Prefira um segredo temporario injetado pelo ambiente ou um arquivo de secret com permissao restrita.
 
 ## Arquitetura
 
@@ -145,9 +150,10 @@ O administrador unico nao pode ser desativado, excluido ou ter o perfil mudado p
 
 ```powershell
 npm run reset-admin
+# ou: npm run reset-admin -- admin@empresa.com
 ```
 
-Defina uma nova senha provisoria, entre com ela, configure novamente o TOTP e altere a senha no primeiro acesso. Registre o procedimento no controle interno de incidentes; nao compartilhe senhas ou segredos TOTP.
+O comando pede uma nova senha provisoria oculta com confirmacao. Em automacao, use `ADMIN_PASSWORD` ou `ADMIN_PASSWORD_FILE`; a senha nunca pode ser passada por argumento. Ele encerra as sessoes ativas, reinicia o 2FA, exige a troca de senha e novo cadastro do TOTP no proximo acesso. Registre o procedimento no controle interno de incidentes; nao compartilhe senhas ou segredos TOTP.
 
 ## Operacao e privacidade
 
