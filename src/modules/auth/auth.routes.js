@@ -1,5 +1,6 @@
 const { Router } = require('express');
-const rateLimit = require('express-rate-limit');
+const crypto = require('node:crypto');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { validate } = require('../../shared/middlewares/validate');
 const {
   requireAuthentication,
@@ -13,9 +14,20 @@ function createAuthRoutes(service) {
   const router = Router();
   const controller = createAuthController(service);
   const manage = requirePermission(service, 'user:manage');
+  const loginRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex');
+      return `${ipKeyGenerator(req.ip)}:${emailHash}`;
+    }
+  });
   router.post(
     '/api/auth/login',
-    rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }),
+    loginRateLimit,
     validate(schema.login, 'body'),
     controller.login
   );

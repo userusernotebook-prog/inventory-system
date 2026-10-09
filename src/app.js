@@ -117,6 +117,8 @@ function createApp(db) {
 
   const app = express();
   app.disable('x-powered-by');
+  // Somente o Nginx do compose fica entre o cliente e esta aplicacao.
+  app.set('trust proxy', 1);
   app.use(
     helmet({
       contentSecurityPolicy: {
