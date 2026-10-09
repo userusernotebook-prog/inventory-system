@@ -1,23 +1,25 @@
 function createMovementsRepository(db) {
   return {
     create(input) {
-      db.prepare(
-        `INSERT INTO movements
+      return db
+        .prepare(
+          `INSERT INTO movements
         (asset_id,employee_from_id,employee_to_id,from_status,to_status,
         movement_type,reason,technical_report,responsible_user_id,occurred_at)
         VALUES(?,?,?,?,?,?,?,?,?,?)`
-      ).run(
-        input.assetId,
-        input.fromEmployeeId,
-        input.toEmployeeId,
-        input.fromStatus,
-        input.toStatus,
-        input.type,
-        input.reason,
-        input.technicalReport,
-        input.responsibleUserId,
-        input.occurredAt
-      );
+        )
+        .run(
+          input.assetId,
+          input.fromEmployeeId,
+          input.toEmployeeId,
+          input.fromStatus,
+          input.toStatus,
+          input.type,
+          input.reason,
+          input.technicalReport,
+          input.responsibleUserId,
+          input.occurredAt
+        ).lastInsertRowid;
     },
     listAssetHistory(assetId) {
       return db

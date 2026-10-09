@@ -34,7 +34,7 @@ function createMovementsService(
   auditService,
   authService
 ) {
-  function performMove(assetId, input, user) {
+  function performMove(assetId, input, user, options = {}) {
     const asset = assetsRepository.findById(assetId);
     if (!asset) throw new ValidationError('Equipamento não encontrado.');
     authService.assertScope(user, asset);
@@ -59,6 +59,11 @@ function createMovementsService(
       throwAsValidationError(error);
     }
     authService.authorize(user, rule.permission);
+    if (rule.requiresApproval && !options.approvedRequestId) {
+      throw new ValidationError(
+        'Esta transição exige uma solicitação aprovada. Use o módulo de aprovações.'
+      );
+    }
 
     if (toStatus === ASSET_STATES.IN_USE) {
       const employee = employeesRepository.findActiveById(employeeToId);
@@ -76,7 +81,7 @@ function createMovementsService(
       toStatus,
       toStatus === ASSET_STATES.DEACTIVATED ? reason : null
     );
-    movementsRepository.create({
+    const movementId = movementsRepository.create({
       assetId,
       fromEmployeeId,
       toEmployeeId: toStatus === ASSET_STATES.IN_USE ? employeeToId : null,
@@ -90,6 +95,7 @@ function createMovementsService(
     });
     return {
       ...rule,
+      movementId,
       previousStatus: asset.status,
       fromEmployeeId,
       toEmployeeId: toStatus === ASSET_STATES.IN_USE ? employeeToId : null

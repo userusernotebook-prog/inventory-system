@@ -30,6 +30,9 @@ const { createImportsRoutes } = require('./modules/imports/imports.routes');
 const { createDashboardRepository } = require('./modules/dashboard/dashboard.repository');
 const { createDashboardService } = require('./modules/dashboard/dashboard.service');
 const { createDashboardRoutes } = require('./modules/dashboard/dashboard.routes');
+const { createApprovalsRepository } = require('./modules/approvals/approvals.repository');
+const { createApprovalsService } = require('./modules/approvals/approvals.service');
+const { createApprovalsRoutes } = require('./modules/approvals/approvals.routes');
 
 // No Node 24/Windows, carregue os módulos JS antes de abrir o addon SQLite.
 const db = require('./db/connection');
@@ -68,6 +71,15 @@ const ticketsService = createTicketsService(
 );
 const importsService = createImportsService(db, createImportsRepository(db), auditService);
 const dashboardService = createDashboardService(createDashboardRepository(db));
+const approvalsService = createApprovalsService(
+  db,
+  createApprovalsRepository(db),
+  assetsRepository,
+  employeesRepository,
+  movementsService,
+  auditService,
+  authService
+);
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -79,6 +91,7 @@ app.use(createDashboardRoutes(dashboardService, authService));
 app.use(createEmployeesRoutes(employeesService, authService));
 app.use(createAssetsRoutes(assetsService, authService));
 app.use(createMovementsRoutes(movementsService, authService));
+app.use(createApprovalsRoutes(approvalsService, authService));
 app.use(createAssignmentsRoutes(assignmentsService, authService));
 app.use(createTicketsRoutes(ticketsService, authService));
 app.use(createImportsRoutes(importsService, authService));

@@ -91,7 +91,7 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
-        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 6);
+        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 7);
         assert.equal(
           migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
           crypto.createHash('sha256').update(initSql.replace(/\r\n/g, '\n')).digest('hex')
@@ -155,6 +155,7 @@ test('a migration do estado do ativo pode ser revertida e aplicada novamente', (
     );
     fs.cpSync(path.join(projectDir, 'src'), path.join(testDir, 'src'), { recursive: true });
     fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '006_users_and_permissions.sql'));
+    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '007_approval_requests.sql'));
     const dbPath = path.join(testDir, 'data', 'inventory.db');
     const db = new Database(dbPath);
     try {
