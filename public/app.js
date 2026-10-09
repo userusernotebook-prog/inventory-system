@@ -90,7 +90,8 @@ async function employees() {
   };
 }
 function employeeTable(rows) {
-  return `<table><thead><tr><th>Nome</th><th>E-mail</th><th>Departamento</th><th>Cidade</th><th>Telefone corporativo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${esc(r.department)}</td><td>${esc(r.city)}</td><td>${esc(r.corporate_phone)}</td><td><span class=status>${r.status === 'active' ? 'Ativo' : 'Desligado'}</span></td><td><button class=ghost data-edit='${r.id}'>Editar</button> ${r.status === 'active' ? `<button class=ghost data-offboard='${r.id}'>Desligamento</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  const labels = { ativo: 'Ativo', em_desligamento: 'Em desligamento', desligado: 'Desligado' };
+  return `<table><thead><tr><th>Nome</th><th>E-mail</th><th>Departamento</th><th>Cidade</th><th>Telefone corporativo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${esc(r.department)}</td><td>${esc(r.city)}</td><td>${esc(r.corporate_phone)}</td><td><span class=status>${esc(labels[r.status] || r.status)}</span></td><td><button class=ghost data-edit='${r.id}'>Editar</button> ${r.status === 'ativo' ? `<button class=ghost data-offboard='${r.id}'>Desligamento</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 function showEmpForm() {
   empForm.innerHTML = `<section class=panel><h2>Novo funcionário</h2><div class=form-grid><input id=en placeholder='Nome'><input id=ec placeholder='Código'><input id=ee placeholder='E-mail'><input id=ed placeholder='Departamento'><input id=eci placeholder='Cidade'><input id=el placeholder='Localidade'><input id=ep placeholder='Telefone corporativo'></div><div class=toolbar><button id=saveEmp>Salvar</button></div></section>`;
@@ -146,42 +147,22 @@ async function showEditEmpForm(id) {
   };
 }
 async function offboard(id, name) {
-  const as = await api(`/api/employees/${id}/assets`);
-  if (!as.length) {
-    if (confirm(`${name} não possui equipamentos atribuídos. Marcar como desligado?`)) {
-      try {
-        await api(`/api/employees/${id}/offboard`, {
-          method: 'POST',
-          body: JSON.stringify({ decisions: {} })
-        });
-        notify('Desligamento concluído.');
-        employees();
-      } catch (e) {
-        notify(e.message);
-      }
-    }
-    return;
-  }
-  app.innerHTML = `<h1>Desligamento: ${esc(name)}</h1><p>Defina o destino de cada equipamento antes de concluir.</p><section class=panel><div id=offs>${as.map((a) => `<div class=toolbar data-off='${a.id}'><b>${esc(a.equipment_type)} ${esc(a.hostname || a.serial)}</b><select><option value=BACKUP>Retornar para backup</option><option value=EM_MANUTENCAO>Enviar para manutenção</option><option value=DESATIVADO>Desativar equipamento</option></select><input data-reason placeholder='Motivo / observação'><input data-report placeholder='Laudo técnico (obrigatório ao desativar)'></div>`).join('')}</div><button id=finishOff>Concluir desligamento</button></section>`;
-  finishOff.onclick = async () => {
-    const decisions = {};
-    document.querySelectorAll('[data-off]').forEach(
-      (x) =>
-        (decisions[x.dataset.off] = {
-          status: x.querySelector('select').value,
-          reason: x.querySelector('[data-reason]').value,
-          technical_report: x.querySelector('[data-report]').value
-        })
-    );
+  app.innerHTML = `<h1>Iniciar desligamento: ${esc(name)}</h1><section class=panel><p>Os ativos atribuídos serão marcados como pendentes de devolução. O recebimento e o destino serão tratados pelo Técnico.</p><form id="startOffboarding"><div class=form-grid><label>Data de desligamento<input id="offDate" type="date" required></label><label class=wide>Motivo<textarea id="offReason" required></textarea></label></div><div class=toolbar><button type="submit">Iniciar desligamento</button><button type="button" class="ghost" id="cancelOffboarding">Cancelar</button></div></form></section>`;
+  document.querySelector('#cancelOffboarding').onclick = employees;
+  document.querySelector('#startOffboarding').onsubmit = async (event) => {
+    event.preventDefault();
     try {
-      await api(`/api/employees/${id}/offboard`, {
+      await api(`/api/employees/${id}/offboarding/start`, {
         method: 'POST',
-        body: JSON.stringify({ decisions })
+        body: JSON.stringify({
+          offboarding_date: document.querySelector('#offDate').value,
+          reason: document.querySelector('#offReason').value
+        })
       });
-      notify('Desligamento concluído e histórico preservado.');
+      notify('Desligamento iniciado. Os ativos aguardam recebimento.');
       employees();
-    } catch (e) {
-      notify(e.message);
+    } catch (error) {
+      notify(error.message);
     }
   };
 }
@@ -254,7 +235,7 @@ async function move() {
     .join(
       ''
     )}</select><select id=ms><option value=EM_USO>Atribuir a funcionário</option><option value=DISPONIVEL>Receber como disponível</option><option value=PENDENTE_DEVOLUCAO>Marcar devolução pendente</option><option value=BACKUP>Enviar para backup</option><option value=EM_MANUTENCAO>Enviar para manutenção</option><option value=EM_AVALIACAO>Enviar para avaliação</option><option value=DESATIVADO>Desativar</option></select><select id=me><option value=''>Selecione o funcionário</option>${es
-    .filter((e) => e.status === 'active')
+    .filter((e) => e.status === 'ativo')
     .map((e) => `<option value='${e.id}'>${esc(e.name)}</option>`)
     .join(
       ''
@@ -281,7 +262,7 @@ async function move() {
 async function tickets() {
   const [rows, es] = await Promise.all([api('/api/tickets'), api('/api/employees')]);
   app.innerHTML = `<h1>Chamados</h1><section class=panel><h2>Novo chamado</h2><div class=form-grid><select id=te><option value=''>Funcionário</option>${es
-    .filter((e) => e.status === 'active')
+    .filter((e) => e.status === 'ativo')
     .map((e) => `<option value='${e.id}'>${esc(e.name)}</option>`)
     .join(
       ''
