@@ -15,3 +15,14 @@
 /coverage/
 /playwright-report/
 /test-results/
+*.pem
+*.key
+*.crt
+/deploy/certs/
+/external-backups/
+/data/
+*.db
+*.db-wal
+*.db-shm
+.env*
+!.env.example
