@@ -11,12 +11,23 @@ services:
       - inventory-data:/app/data
     expose:
       - '3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     ports:
       - '80:80'
       - '443:443'
@@ -26,22 +37,22 @@ services:
 
   backup:
     build: .
-    restart: unless-stopped
+    restart: on-failure
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     environment:
       DATABASE_PATH: /app/data/inventory.db
       BACKUP_DIR: /app/data/backups
       BACKUP_EXTERNAL_DIR: /external-backups
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_MONITOR_URL: ${BACKUP_MONITOR_URL:-}
+      AGE_RECIPIENT: ${AGE_RECIPIENT:-}
     volumes:
       - inventory-data:/app/data
       - ${BACKUP_EXTERNAL_HOST_DIR:-./external-backups}:/external-backups
-    command:
-      - /bin/sh
-      - -c
-      - 'while true; do node scripts/backup.js; sleep $$BACKUP_INTERVAL_SECONDS; done'
+    command: ['node', 'scripts/backup-daemon.js']
 
 volumes:
   inventory-data:

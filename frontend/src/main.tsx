@@ -2,8 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { canUser } from './lib/permissions';
+import { api } from './lib/api';
 import {
   AssetsPage,
   AssetDetailPage,
@@ -22,12 +24,40 @@ const queryClient = new QueryClient({
   }
 });
 function Dashboard() {
+  const { user } = useAuth();
+  const backup = useQuery({
+    queryKey: ['backup-status'],
+    enabled: canUser(user, 'audit:read'),
+    queryFn: () =>
+      api<{ latestSuccessful: { finishedAt: string; sizeBytes: number } | null }>(
+        '/api/admin/backup-status'
+      )
+  });
   return (
     <section>
       <h1 className="text-2xl font-bold">Dashboard</h1>
       <p className="mt-2 text-slate-600">
         Acompanhe inventário, chamados e aprovações pelo menu lateral.
       </p>
+      {canUser(user, 'audit:read') && (
+        <section className="card mt-6 max-w-md" aria-live="polite">
+          <h2 className="font-bold">Ultimo backup bem-sucedido</h2>
+          {backup.isLoading && <p className="mt-2 text-sm">Carregando...</p>}
+          {backup.data?.latestSuccessful ? (
+            <p className="mt-2 text-sm text-slate-700">
+              {new Intl.DateTimeFormat('pt-BR', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+                timeZone: 'America/Sao_Paulo'
+              }).format(new Date(backup.data.latestSuccessful.finishedAt))}
+              {' · '}
+              {backup.data.latestSuccessful.sizeBytes.toLocaleString('pt-BR')} bytes
+            </p>
+          ) : (
+            !backup.isLoading && <p className="mt-2 text-sm text-slate-600">Nenhum backup concluido.</p>
+          )}
+        </section>
+      )}
     </section>
   );
 }

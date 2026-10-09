@@ -44,6 +44,8 @@ const { createApprovalsRoutes } = require('./modules/approvals/approvals.routes'
 const { createOffboardingRepository } = require('./modules/offboarding/offboarding.repository');
 const { createOffboardingService } = require('./modules/offboarding/offboarding.service');
 const { createOffboardingRoutes } = require('./modules/offboarding/offboarding.routes');
+const { createBackupStatusService } = require('./modules/backups/backup-status.service');
+const { createBackupStatusRoutes } = require('./modules/backups/backup-status.routes');
 
 // No Node 24/Windows, carregue os módulos JS antes de abrir o addon SQLite.
 function createApp(db) {
@@ -109,6 +111,9 @@ function createApp(db) {
     auditService,
     authService
   );
+  const backupStatusService = createBackupStatusService({
+    backupDirectory: process.env.BACKUP_DIR || path.resolve(__dirname, '..', 'data', 'backups')
+  });
 
   const app = express();
   app.disable('x-powered-by');
@@ -127,6 +132,10 @@ function createApp(db) {
   );
   app.use(requestSecurity);
   app.use(express.json({ limit: '1mb' }));
+  app.get('/health', (req, res) => {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok' });
+  });
   app.use(createAuthRoutes(authService));
   app.use('/api', requireAuthentication(authService));
   app.use('/api', requireCompletedOnboarding);
@@ -146,6 +155,7 @@ function createApp(db) {
   app.use(createMovementsRoutes(movementsService, authService));
   app.use(createApprovalsRoutes(approvalsService, authService));
   app.use(createOffboardingRoutes(offboardingService, authService));
+  app.use(createBackupStatusRoutes(backupStatusService, authService));
   app.use(createAssignmentsRoutes(assignmentsService, authService));
   app.use(createTicketsRoutes(ticketsService, authService));
   app.use(createImportsRoutes(importsService, authService));
