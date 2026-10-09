@@ -8,6 +8,11 @@ const LOCK_MS = 15 * 60 * 1000;
 const profiles = new Set(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']);
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
+async function hasValidTotp(token, secret) {
+  const result = await verify({ token, secret });
+  return result.valid;
+}
+
 function createAuthService(repository, auditService) {
   function effectivePermissions(user) {
     const granted = new Set(repository.rolePermissions(user.profile_base));
@@ -66,10 +71,7 @@ function createAuthService(repository, auditService) {
       );
       throw new UnauthorizedError('E-mail ou senha inválidos.');
     }
-    if (
-      user.totp_enabled &&
-      !(await verify({ token: String(input.totp_code || ''), secret: user.totp_secret }))
-    )
+    if (user.totp_enabled && !(await hasValidTotp(String(input.totp_code || ''), user.totp_secret)))
       throw new UnauthorizedError('Código de autenticação inválido.');
     repository.updateLogin(user.id);
     const token = crypto.randomBytes(32).toString('base64url');
@@ -170,7 +172,7 @@ function createAuthService(repository, auditService) {
     },
     async confirmTotp(user, code) {
       const fresh = repository.findById(user.id);
-      if (!(await verify({ token: code, secret: fresh.totp_secret })))
+      if (!(await hasValidTotp(code, fresh.totp_secret)))
         throw new ValidationError('Código TOTP inválido.');
       repository.setTotp(user.id, fresh.totp_secret, true);
       return { ok: true };
