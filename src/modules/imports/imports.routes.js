@@ -8,7 +8,13 @@ const schema = require('./imports.schema');
 
 const upload = multer({
   dest: path.resolve(__dirname, '..', '..', '..', 'data', 'uploads'),
-  limits: { fileSize: 15 * 1024 * 1024 }
+  limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 5 },
+  fileFilter(req, file, callback) {
+    const validName = /\.xlsx$/i.test(file.originalname) || /\.xlsm$/i.test(file.originalname);
+    // MIME comes from the client and is often omitted by browsers. The extension
+    // is an early filter; workbook parsing below is the authoritative validation.
+    callback(validName ? null : new multer.MulterError('LIMIT_UNEXPECTED_FILE'), validName);
+  }
 });
 
 function createImportsRoutes(service, authService) {

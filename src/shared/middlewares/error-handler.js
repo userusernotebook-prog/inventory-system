@@ -31,7 +31,17 @@ function errorHandler(error, req, res, next) {
   if (typeof error.code === 'string' && error.code.startsWith('SQLITE_CONSTRAINT')) {
     return sendError(res, 409, 'CONFLICT', 'Não foi possível concluir a operação.');
   }
-  console.error('Erro interno na API:', error);
+  // Request data and stack traces may contain personal data or secrets.
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      event: 'api_internal_error',
+      request_id: req.requestId || null,
+      method: req.method,
+      route: req.route?.path || req.path,
+      error_type: error?.name || 'Error'
+    })
+  );
   return sendError(res, 500, 'INTERNAL_ERROR', 'Erro interno. Tente novamente mais tarde.');
 }
 

@@ -98,6 +98,7 @@ function createAuthService(repository, auditService) {
         throw new ForbiddenError('Você não tem permissão para esta operação.');
     },
     effectivePermissions(user) {
+      if (!user) throw new ValidationError('Usuário não encontrado.');
       return effectivePermissions(user);
     },
     scopes(user) {

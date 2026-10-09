@@ -13,6 +13,12 @@ function createAssetsRoutes(service, authService) {
     validate(schema.list, 'query'),
     controller.list
   );
+  router.get(
+    '/api/assets/:id',
+    ...requirePermission(authService, 'asset:read'),
+    validate(schema.params, 'params'),
+    controller.get
+  );
   router.post(
     '/api/assets',
     ...requirePermission(authService, 'asset:create'),

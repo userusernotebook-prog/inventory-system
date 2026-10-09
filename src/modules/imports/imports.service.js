@@ -15,9 +15,7 @@ function createImportsService(db, repository, auditService) {
         try {
           workbook = readWorkbook(file.path);
         } catch {
-          throw new ValidationError(
-            'Não foi possível importar o Excel. Verifique se a estrutura é compatível.'
-          );
+          throw new ValidationError('Não foi possível importar o Excel. Verifique a estrutura.');
         }
         if (workbook.SheetNames.some((name) => norm(name) === 'SENHAS')) {
           throw new ValidationError(
@@ -43,18 +41,18 @@ function createImportsService(db, repository, auditService) {
         })();
       } catch (error) {
         if (error instanceof DomainError) throw error;
-        if (!newTemplate) {
-          console.error('Falha na importação legada:', error);
-          throw new ValidationError(
-            'Não foi possível importar o Excel. Verifique se a estrutura é compatível.'
-          );
-        }
-        throw error;
+        console.error(
+          JSON.stringify({
+            level: 'warn',
+            event: newTemplate ? 'template_import_failed' : 'legacy_import_failed'
+          })
+        );
+        throw new ValidationError('Não foi possível importar o Excel. Verifique a estrutura.');
       } finally {
         try {
           fs.unlinkSync(file.path);
-        } catch (error) {
-          console.error('Não foi possível remover o arquivo temporário:', error);
+        } catch {
+          console.error(JSON.stringify({ level: 'warn', event: 'upload_cleanup_failed' }));
         }
       }
     }

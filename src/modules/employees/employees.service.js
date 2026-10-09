@@ -3,16 +3,30 @@ const { text, optionalDate } = require('../../shared/utils/text');
 const { pageResult } = require('../../shared/utils/query');
 
 function createEmployeesService(db, repository, auditService, authService) {
+  function present(employee, user) {
+    const value = { ...employee };
+    if (!['ADMIN', 'RH'].includes(user.profile_base)) value.personal_phone = null;
+    if (user.profile_base === 'CONSULTA' && value.email) {
+      const [local, domain] = value.email.split('@');
+      value.email = `${local.slice(0, 2)}***@${domain || ''}`;
+      value.corporate_phone = null;
+    }
+    return value;
+  }
   return {
     list(options, user) {
       const result = repository.list(options, authService.scopes(user));
-      return pageResult({ ...options, ...result });
+      return pageResult({
+        ...options,
+        ...result,
+        items: result.items.map((employee) => present(employee, user))
+      });
     },
     get(id, user) {
       const employee = repository.findById(id);
       if (!employee) throw new NotFoundError('Funcionário não encontrado.');
       authService.assertScope(user, employee);
-      return employee;
+      return present(employee, user);
     },
     create(body, technician) {
       if (!text(body.name)) throw new ValidationError('Nome é obrigatório.');

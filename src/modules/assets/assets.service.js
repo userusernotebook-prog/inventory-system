@@ -1,4 +1,5 @@
 const { ValidationError } = require('../../shared/errors');
+const { NotFoundError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { ASSET_STATES } = require('./domain/asset-state-machine');
 const { pageResult } = require('../../shared/utils/query');
@@ -8,6 +9,12 @@ function createAssetsService(db, repository, auditService, authService) {
     list(options, user) {
       const result = repository.list(options, authService.scopes(user));
       return pageResult({ ...options, ...result });
+    },
+    get(id, user) {
+      const asset = repository.findById(id);
+      if (!asset) throw new NotFoundError('Ativo não encontrado.');
+      authService.assertScope(user, asset);
+      return asset;
     },
     create(body, technician) {
       if (!text(body.equipment_type)) {

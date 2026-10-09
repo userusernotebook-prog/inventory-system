@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { validate } = require('../../shared/middlewares/validate');
-const { requirePermission, requireAuthentication } = require('../../shared/middlewares/auth');
+const { requirePermission } = require('../../shared/middlewares/auth');
 const schema = require('./approvals.schema');
 const { createApprovalsController } = require('./approvals.controller');
 function createApprovalsRoutes(service, authService) {
@@ -44,11 +44,15 @@ function createApprovalsRoutes(service, authService) {
   );
   router.post(
     '/api/approval-requests/:id/cancel',
-    requireAuthentication(authService),
+    ...requirePermission(authService, 'request:create'),
     validate(schema.params, 'params'),
     controller.cancel
   );
-  router.get('/api/notifications', requireAuthentication(authService), controller.notifications);
+  router.get(
+    '/api/notifications',
+    ...requirePermission(authService, 'request:create'),
+    controller.notifications
+  );
   return router;
 }
 module.exports = { createApprovalsRoutes };

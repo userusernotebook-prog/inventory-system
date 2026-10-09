@@ -20,7 +20,8 @@ module.exports = [
       '.import-test-*/**',
       '.offboard-test-*/**',
       '.migration-test-*/**',
-      '.contract-test-*/**'
+      '.contract-test-*/**',
+      'public/assets/**'
     ]
   },
   {

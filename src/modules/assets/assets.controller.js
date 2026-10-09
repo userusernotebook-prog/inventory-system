@@ -3,6 +3,9 @@ function createAssetsController(service) {
     list(req, res) {
       res.json(service.list(req.validated.query, req.user));
     },
+    get(req, res) {
+      res.json(service.get(req.validated.params.id, req.user));
+    },
     create(req, res) {
       res.json(service.create(req.validated.body, req.user));
     },

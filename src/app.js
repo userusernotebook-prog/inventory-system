@@ -1,9 +1,15 @@
 const express = require('express');
 const path = require('node:path');
 const swaggerUi = require('swagger-ui-express');
+const helmet = require('helmet');
 const { errorHandler } = require('./shared/middlewares/error-handler');
-const { requireAuthentication, requireCompletedOnboarding } = require('./shared/middlewares/auth');
+const {
+  requireAuthentication,
+  requireCompletedOnboarding,
+  requirePermission
+} = require('./shared/middlewares/auth');
 const { buildOpenApi } = require('./shared/openapi');
+const { requestSecurity } = require('./shared/middlewares/security');
 
 const { createAuthRepository } = require('./modules/auth/auth.repository');
 const { createAuthService } = require('./modules/auth/auth.service');
@@ -98,12 +104,34 @@ const offboardingService = createOffboardingService(
 );
 
 const app = express();
+app.disable('x-powered-by');
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:']
+      }
+    },
+    crossOriginEmbedderPolicy: false
+  })
+);
+app.use(requestSecurity);
 app.use(express.json({ limit: '1mb' }));
 app.use(createAuthRoutes(authService));
 app.use('/api', requireAuthentication(authService));
 app.use('/api', requireCompletedOnboarding);
-app.get('/api/openapi.json', (req, res) => res.json(buildOpenApi()));
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApi(), { explorer: true }));
+app.get('/api/openapi.json', ...requirePermission(authService, 'audit:read'), (req, res) =>
+  res.json(buildOpenApi())
+);
+app.use(
+  '/api/docs',
+  ...requirePermission(authService, 'audit:read'),
+  swaggerUi.serve,
+  swaggerUi.setup(buildOpenApi(), { explorer: true })
+);
 app.use(createAuditRoutes(auditService, authService));
 app.use(createDashboardRoutes(dashboardService, authService));
 app.use(createEmployeesRoutes(employeesService, authService));
