@@ -113,20 +113,20 @@ function createAuthService(repository, auditService) {
       return rows.filter((row) => isInScope(user, row));
     },
     async createUser(input, actor) {
-      if (!profiles.has(input.profile_base)) throw new ValidationError('Perfil inválido.');
-      if (input.profile_base === 'ADMIN') {
+      if (!profiles.has(input.profileBase)) throw new ValidationError('Perfil inválido.');
+      if (input.profileBase === 'ADMIN') {
         throw new ForbiddenError('O administrador só pode ser criado pelo comando create-admin.');
       }
       const id = repository.createUser({
         name: input.name,
         email: input.email,
         passwordHash: await argon2.hash(input.password),
-        profileBase: input.profile_base,
+        profileBase: input.profileBase,
         active: true,
         mustChangePassword: true
       });
       auditService.logUser(actor, 'create', 'user', id, {
-        after: { name: input.name, email: input.email, profile_base: input.profile_base }
+        after: { name: input.name, email: input.email, profile_base: input.profileBase }
       });
       return { id };
     },
@@ -135,12 +135,12 @@ function createAuthService(repository, auditService) {
       if (!current) throw new ValidationError('Usuário não encontrado.');
       if (
         current.profile_base === 'ADMIN' &&
-        (input.profile_base !== 'ADMIN' || input.active === false)
+        (input.profileBase !== 'ADMIN' || input.active === false)
       )
         throw new ForbiddenError('O administrador único não pode ser alterado nem desativado.');
       if (
         Number(id) === actor.id &&
-        (input.profile_base !== current.profile_base || input.active === false)
+        (input.profileBase !== current.profile_base || input.active === false)
       )
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
       repository.updateUser(id, { ...current, ...input });

@@ -8,18 +8,31 @@ const login = z.object({
 const password = z.object({
   password: z.string().min(12, 'A senha deve ter ao menos 12 caracteres.')
 });
-const user = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(12),
-  profile_base: z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA'])
-});
-const userUpdate = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  profile_base: z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']),
-  active: z.boolean()
-});
+const profileBase = z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']);
+const user = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(12),
+    profile_base: profileBase
+  })
+  .strict()
+  .transform(({ profile_base: profileBaseValue, ...input }) => ({
+    ...input,
+    profileBase: profileBaseValue
+  }));
+const userUpdate = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    profile_base: profileBase,
+    active: z.boolean()
+  })
+  .strict()
+  .transform(({ profile_base: profileBaseValue, ...input }) => ({
+    ...input,
+    profileBase: profileBaseValue
+  }));
 const id = z.object({ id: z.coerce.number().int().positive() });
 const userList = paginationSchema.extend({
   q: z.string().trim().max(120).optional(),

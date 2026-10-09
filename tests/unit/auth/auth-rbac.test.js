@@ -31,7 +31,7 @@ test('perfis, deny, alcance e proteção contra escalada de privilégios', async
         name: 'Técnica',
         email: 'tecnica@example.test',
         password: 'SenhaProvisoria1',
-        profile_base: 'TECNICO'
+        profileBase: 'TECNICO'
       },
       admin
     );
@@ -53,7 +53,7 @@ test('perfis, deny, alcance e proteção contra escalada de privilégios', async
       /próprios privilégios/
     );
     assert.throws(
-      () => service.updateUser(created.id, { ...technician, profile_base: 'ADMIN' }, technician),
+      () => service.updateUser(created.id, { ...technician, profileBase: 'ADMIN' }, technician),
       /próprios privilégios/
     );
     await assert.rejects(
@@ -62,7 +62,7 @@ test('perfis, deny, alcance e proteção contra escalada de privilégios', async
           name: 'Segundo administrador',
           email: 'outro-admin@example.test',
           password: 'SenhaProvisoria1',
-          profile_base: 'ADMIN'
+          profileBase: 'ADMIN'
         },
         admin
       ),
