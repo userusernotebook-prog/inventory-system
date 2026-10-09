@@ -40,12 +40,26 @@ function migrate(db) {
 
   for (const file of files) {
     const version = Number(file.slice(0, 3));
-    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-    const checksum = crypto.createHash('sha256').update(sql).digest('hex');
+    const source = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+    const sql = source.replace(/\r\n/g, '\n');
+    const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
+    const checksum = hash(sql);
+    const compatibleChecksums = new Set([
+      checksum,
+      hash(source),
+      hash(sql.replace(/\n/g, '\r\n')),
+      hash(sql.replace(/\n$/, '\r\n'))
+    ]);
     const previous = applied.get(version);
     if (previous) {
-      if (previous.name !== file || previous.checksum !== checksum) {
+      if (previous.name !== file || !compatibleChecksums.has(previous.checksum)) {
         throw new Error(`A migration ${file} foi alterada após sua aplicação.`);
+      }
+      if (previous.checksum !== checksum) {
+        db.prepare('UPDATE schema_migrations SET checksum=? WHERE version=?').run(
+          checksum,
+          version
+        );
       }
       continue;
     }

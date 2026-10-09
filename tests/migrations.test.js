@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const Database = require('better-sqlite3');
 
@@ -59,12 +60,34 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       }
 
       runMigration(testDir);
+      const historical = new Database(dbPath);
+      try {
+        const oldChecksum = crypto
+          .createHash('sha256')
+          .update(initSql.replace(/\r\n/g, '\n').replace(/\n$/, '\r\n'))
+          .digest('hex');
+        historical
+          .prepare('UPDATE schema_migrations SET checksum=? WHERE version=1')
+          .run(oldChecksum);
+      } finally {
+        historical.close();
+      }
+      const copiedMigrations = path.join(testDir, 'src', 'db', 'migrations');
+      for (const file of fs.readdirSync(copiedMigrations)) {
+        const migrationPath = path.join(copiedMigrations, file);
+        const sql = fs.readFileSync(migrationPath, 'utf8').replace(/\r\n/g, '\n');
+        fs.writeFileSync(migrationPath, sql.replace(/\n/g, '\r\n'));
+      }
       runMigration(testDir);
       const migrated = new Database(dbPath, { readonly: true });
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
         assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 4);
+        assert.equal(
+          migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
+          crypto.createHash('sha256').update(initSql.replace(/\r\n/g, '\n')).digest('hex')
+        );
         assert.equal(migrated.prepare('SELECT COUNT(*) n FROM technicians').get().n, 1);
         assert.equal(
           migrated.prepare('SELECT name FROM employees WHERE id=11').get().name,
