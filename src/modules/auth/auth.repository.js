@@ -8,6 +8,16 @@ function createAuthRepository(db) {
         'Administrador',
         'Técnico 1'
       );
+    },
+    findActiveById(id) {
+      return db.prepare('SELECT * FROM technicians WHERE id=? AND active=1').get(id);
+    },
+    listActive() {
+      return db.prepare('SELECT id,name,role FROM technicians WHERE active=1 ORDER BY name').all();
+    },
+    create(name, role) {
+      return db.prepare('INSERT INTO technicians(name,role) VALUES(?,?)').run(name, role)
+        .lastInsertRowid;
     }
   };
 }
