@@ -1,6 +1,5 @@
 # Sistema de Gestão de Ativos
 
-Protótipo funcional criado a partir da estrutura da planilha **\_BASE DE CHAMADOS E RELATORIOS - ISDIN - Q1-2025.xlsm**.
 
 ## O que já faz
 
