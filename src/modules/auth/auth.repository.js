@@ -20,8 +20,8 @@ function createAuthRepository(db) {
     },
     createSession(hash, userId, expiresAt) {
       db.prepare(
-        'INSERT INTO sessions(token_hash,user_id,expires_at,last_seen_at) VALUES(?,?,?,?)'
-      ).run(hash, userId, expiresAt, new Date().toISOString());
+        'INSERT INTO sessions(token_hash,user_id,expires_at,last_seen_at,created_at) VALUES(?,?,?,?,?)'
+      ).run(hash, userId, expiresAt, new Date().toISOString(), new Date().toISOString());
     },
     revokeSessions(userId) {
       db.prepare('UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL').run(

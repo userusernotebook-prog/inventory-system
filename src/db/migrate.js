@@ -16,11 +16,9 @@ function applyStructuralMigration(db, sql, record) {
   try {
     db.exec('BEGIN IMMEDIATE');
     db.exec(sql);
-    db.prepare('INSERT INTO schema_migrations(version,name,checksum) VALUES(?,?,?)').run(
-      record.version,
-      record.file,
-      record.checksum
-    );
+    db.prepare(
+      'INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?,?,?,?)'
+    ).run(record.version, record.file, record.checksum, new Date().toISOString());
     db.exec('COMMIT');
   } catch (error) {
     try {
@@ -100,11 +98,9 @@ function migrate(db) {
       const alreadyPresent =
         column && db.pragma('table_info(employees)').some((entry) => entry.name === column);
       if (!alreadyPresent) db.exec(sql);
-      db.prepare('INSERT INTO schema_migrations(version,name,checksum) VALUES(?,?,?)').run(
-        version,
-        file,
-        checksum
-      );
+      db.prepare(
+        'INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?,?,?,?)'
+      ).run(version, file, checksum, new Date().toISOString());
     })();
   }
 }

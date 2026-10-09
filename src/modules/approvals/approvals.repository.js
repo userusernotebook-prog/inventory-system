@@ -22,10 +22,9 @@ function createApprovalsRepository(db) {
       ).run(requestId, assetId, role, expectedStatus);
     },
     reserve(assetId, requestId) {
-      db.prepare('INSERT INTO approval_asset_reservations(asset_id,request_id) VALUES(?,?)').run(
-        assetId,
-        requestId
-      );
+      db.prepare(
+        'INSERT INTO approval_asset_reservations(asset_id,request_id,reserved_at) VALUES(?,?,?)'
+      ).run(assetId, requestId, new Date().toISOString());
     },
     reservationForAsset(assetId) {
       return db
@@ -44,8 +43,15 @@ function createApprovalsRepository(db) {
     },
     addEvent(requestId, eventType, actorUserId, details = {}, movementId = null) {
       db.prepare(
-        'INSERT INTO approval_request_events(request_id,event_type,actor_user_id,details,movement_id) VALUES(?,?,?,?,?)'
-      ).run(requestId, eventType, actorUserId, JSON.stringify(details), movementId);
+        'INSERT INTO approval_request_events(request_id,event_type,actor_user_id,details,movement_id,created_at) VALUES(?,?,?,?,?,?)'
+      ).run(
+        requestId,
+        eventType,
+        actorUserId,
+        JSON.stringify(details),
+        movementId,
+        new Date().toISOString()
+      );
     },
     findById(id) {
       return db.prepare('SELECT * FROM approval_requests WHERE id=?').get(id);
@@ -126,12 +132,9 @@ function createApprovalsRepository(db) {
       );
     },
     notify(userId, type, title, body) {
-      db.prepare('INSERT INTO user_notifications(user_id,type,title,body) VALUES(?,?,?,?)').run(
-        userId,
-        type,
-        title,
-        body
-      );
+      db.prepare(
+        'INSERT INTO user_notifications(user_id,type,title,body,created_at) VALUES(?,?,?,?,?)'
+      ).run(userId, type, title, body, new Date().toISOString());
     },
     pendingCount() {
       return db

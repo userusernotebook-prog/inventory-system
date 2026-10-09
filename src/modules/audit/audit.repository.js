@@ -2,8 +2,8 @@ function createAuditRepository(db) {
   return {
     log(actor, action, entityType, entityId, details, actorUserId = null) {
       db.prepare(
-        'INSERT INTO audit_log(actor,action,entity_type,entity_id,details,actor_user_id) VALUES(?,?,?,?,?,?)'
-      ).run(actor, action, entityType, entityId, details, actorUserId);
+        'INSERT INTO audit_log(actor,action,entity_type,entity_id,details,actor_user_id,created_at) VALUES(?,?,?,?,?,?,?)'
+      ).run(actor, action, entityType, entityId, details, actorUserId, new Date().toISOString());
     },
     list(options) {
       const where = [];

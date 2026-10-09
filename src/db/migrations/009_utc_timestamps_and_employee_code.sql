@@ -8,6 +8,9 @@ DROP TRIGGER IF EXISTS approval_events_prevent_delete;
 DROP TRIGGER IF EXISTS employee_events_prevent_update;
 DROP TRIGGER IF EXISTS employee_events_prevent_delete;
 
+UPDATE schema_migrations SET applied_at=strftime('%Y-%m-%dT%H:%M:%fZ',applied_at)
+WHERE length(applied_at)>10 AND instr(applied_at,'Z')=0;
+
 UPDATE employees SET created_at=strftime('%Y-%m-%dT%H:%M:%fZ',created_at),
   updated_at=strftime('%Y-%m-%dT%H:%M:%fZ',updated_at),
   offboarding_started_at=CASE WHEN offboarding_started_at IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ',offboarding_started_at) END

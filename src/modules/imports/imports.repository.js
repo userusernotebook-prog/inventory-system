@@ -10,7 +10,7 @@ function createImportsRepository(db) {
         .prepare(
           `INSERT INTO employees
           (code,name,email,department,cost_center,city,location,corporate_phone,
-          personal_phone,status,hire_date,offboarded_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+          personal_phone,status,hire_date,offboarded_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.code,
@@ -24,7 +24,9 @@ function createImportsRepository(db) {
           input.personalPhone,
           input.status,
           input.hireDate,
-          input.offboardedAt
+          input.offboardedAt,
+          new Date().toISOString(),
+          new Date().toISOString()
         ).lastInsertRowid;
     },
     hasSerial(serial) {
@@ -40,8 +42,8 @@ function createImportsRepository(db) {
         .prepare(
           `INSERT INTO assets
           (equipment_type,hostname,manufacturer,model,serial,reference,description,
-          imei1,imei2,apple_id,condition_text,city,location,status,retirement_reason)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          imei1,imei2,apple_id,condition_text,city,location,status,retirement_reason,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.type,
@@ -58,20 +60,22 @@ function createImportsRepository(db) {
           input.city,
           input.location,
           input.status,
-          input.retirementReason
+          input.retirementReason,
+          new Date().toISOString(),
+          new Date().toISOString()
         ).lastInsertRowid;
     },
     insertAssignment(assetId, employeeId, responsibleUserId) {
       db.prepare(
-        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
-      ).run(assetId, employeeId, responsibleUserId);
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
     },
     insertInitialMovement(assetId, employeeId, status, reason, technicalReport, responsibleUserId) {
       db.prepare(
         `INSERT INTO movements
         (asset_id,employee_to_id,from_status,to_status,movement_type,reason,
-        responsible_user_id,technical_report,occurred_at)
-        VALUES(?,?, 'DISPONIVEL',?,'IMPORTACAO_INICIAL',?,?,?,?)`
+        responsible_user_id,technical_report,occurred_at,created_at)
+        VALUES(?,?, 'DISPONIVEL',?,'IMPORTACAO_INICIAL',?,?,?,?,?)`
       ).run(
         assetId,
         employeeId,
@@ -79,6 +83,7 @@ function createImportsRepository(db) {
         reason,
         responsibleUserId,
         technicalReport,
+        new Date().toISOString(),
         new Date().toISOString()
       );
     },
@@ -87,8 +92,11 @@ function createImportsRepository(db) {
     },
     insertLegacyEmployee(code, name, city, department) {
       return db
-        .prepare("INSERT INTO employees(code,name,city,department,status) VALUES(?,?,?,?,'ativo')")
-        .run(code, name, city, department).lastInsertRowid;
+        .prepare(
+          "INSERT INTO employees(code,name,city,department,status,created_at,updated_at) VALUES(?,?,?,?,'ativo',?,?)"
+        )
+        .run(code, name, city, department, new Date().toISOString(), new Date().toISOString())
+        .lastInsertRowid;
     },
     legacyAssetExists(serial, hostname) {
       return Boolean(
@@ -102,8 +110,8 @@ function createImportsRepository(db) {
         .prepare(
           `INSERT INTO assets
           (hostname,equipment_type,manufacturer,model,serial,description,imei1,imei2,
-          apple_id,reference,condition_text,city,location,activated_at,replaced_at,status)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DISPONIVEL')`
+          apple_id,reference,condition_text,city,location,activated_at,replaced_at,status,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DISPONIVEL',?,?)`
         )
         .run(
           input.hostname,
@@ -120,14 +128,19 @@ function createImportsRepository(db) {
           input.city,
           input.location,
           input.activatedAt,
-          input.replacedAt
+          input.replacedAt,
+          new Date().toISOString(),
+          new Date().toISOString()
         ).lastInsertRowid;
     },
     assignLegacyAsset(assetId, employeeId, responsibleUserId) {
       db.prepare(
-        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
-      ).run(assetId, employeeId, responsibleUserId);
-      db.prepare("UPDATE assets SET status='EM_USO' WHERE id=?").run(assetId);
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
+      db.prepare("UPDATE assets SET status='EM_USO',updated_at=? WHERE id=?").run(
+        new Date().toISOString(),
+        assetId
+      );
     },
     findLegacyAsset(value) {
       return db.prepare('SELECT id FROM assets WHERE serial=? OR hostname=?').get(value, value);

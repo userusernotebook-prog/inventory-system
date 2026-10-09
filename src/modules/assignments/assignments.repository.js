@@ -13,8 +13,8 @@ function createAssignmentsRepository(db) {
     },
     create(assetId, employeeId, responsibleUserId) {
       db.prepare(
-        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
-      ).run(assetId, employeeId, responsibleUserId);
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
     },
     listEmployeeAssets(employeeId) {
       return db

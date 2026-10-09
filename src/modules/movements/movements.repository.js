@@ -5,8 +5,8 @@ function createMovementsRepository(db) {
         .prepare(
           `INSERT INTO movements
         (asset_id,employee_from_id,employee_to_id,from_status,to_status,
-        movement_type,reason,technical_report,responsible_user_id,occurred_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`
+        movement_type,reason,technical_report,responsible_user_id,occurred_at,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.assetId,
@@ -18,7 +18,8 @@ function createMovementsRepository(db) {
           input.reason,
           input.technicalReport,
           input.responsibleUserId,
-          input.occurredAt
+          input.occurredAt,
+          new Date().toISOString()
         ).lastInsertRowid;
     },
     listAssetHistory(assetId) {

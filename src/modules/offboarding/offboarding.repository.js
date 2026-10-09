@@ -14,20 +14,21 @@ function createOffboardingRepository(db) {
     },
     event(employeeId, type, actorId, details = {}) {
       db.prepare(
-        'INSERT INTO employee_events(employee_id,event_type,actor_user_id,details) VALUES(?,?,?,?)'
-      ).run(employeeId, type, actorId, JSON.stringify(details));
+        'INSERT INTO employee_events(employee_id,event_type,actor_user_id,details,created_at) VALUES(?,?,?,?,?)'
+      ).run(employeeId, type, actorId, JSON.stringify(details), new Date().toISOString());
     },
     addReceipt(input) {
       db.prepare(
-        `INSERT INTO asset_receipts(asset_id,employee_id,received_by_user_id,received_at,physical_condition,accessories)
-        VALUES(?,?,?,?,?,?)`
+        `INSERT INTO asset_receipts(asset_id,employee_id,received_by_user_id,received_at,physical_condition,accessories,created_at)
+        VALUES(?,?,?,?,?,?,?)`
       ).run(
         input.assetId,
         input.employeeId,
         input.userId,
         input.receivedAt,
         input.condition,
-        input.accessories
+        input.accessories,
+        new Date().toISOString()
       );
     },
     findReceipt(assetId) {
