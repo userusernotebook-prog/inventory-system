@@ -8,6 +8,30 @@ const legacyColumns = new Map([
   [3, 'cost_center'],
   [4, 'hire_date']
 ]);
+const structuralMigrations = new Set([5, 6]);
+
+function applyStructuralMigration(db, sql, record) {
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    db.exec(sql);
+    db.prepare('INSERT INTO schema_migrations(version,name,checksum) VALUES(?,?,?)').run(
+      record.version,
+      record.file,
+      record.checksum
+    );
+    db.exec('COMMIT');
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // A transação pode não ter sido iniciada quando a leitura do banco falhar.
+    }
+    throw error;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
 
 function migrate(db) {
   db.exec(`
@@ -64,6 +88,10 @@ function migrate(db) {
       continue;
     }
 
+    if (structuralMigrations.has(version)) {
+      applyStructuralMigration(db, sql, { version, file, checksum });
+      continue;
+    }
     db.transaction(() => {
       const column = legacyColumns.get(version);
       const alreadyPresent =

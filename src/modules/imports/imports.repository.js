@@ -1,12 +1,5 @@
 function createImportsRepository(db) {
   return {
-    activeAdminId() {
-      return (
-        db
-          .prepare("SELECT id FROM technicians WHERE role='admin' AND active=1 ORDER BY id LIMIT 1")
-          .get()?.id || null
-      );
-    },
     employeesByCode(code) {
       return db
         .prepare('SELECT id,name,status FROM employees WHERE code=? COLLATE NOCASE')
@@ -68,19 +61,26 @@ function createImportsRepository(db) {
           input.retirementReason
         ).lastInsertRowid;
     },
-    insertAssignment(assetId, employeeId, technicianId) {
-      db.prepare('INSERT INTO assignments(asset_id,employee_id,technician_id) VALUES(?,?,?)').run(
-        assetId,
-        employeeId,
-        technicianId
-      );
+    insertAssignment(assetId, employeeId, responsibleUserId) {
+      db.prepare(
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId);
     },
-    insertInitialMovement(assetId, employeeId, status, reason, technicianId) {
+    insertInitialMovement(assetId, employeeId, status, reason, technicalReport, responsibleUserId) {
       db.prepare(
         `INSERT INTO movements
-        (asset_id,employee_to_id,from_status,to_status,movement_type,reason,technician_id)
-        VALUES(?,?,NULL,?,'initial_import',?,?)`
-      ).run(assetId, employeeId, status, reason, technicianId);
+        (asset_id,employee_to_id,from_status,to_status,movement_type,reason,
+        responsible_user_id,technical_report,occurred_at)
+        VALUES(?,?, 'DISPONIVEL',?,'IMPORTACAO_INICIAL',?,?,?,?)`
+      ).run(
+        assetId,
+        employeeId,
+        status,
+        reason,
+        responsibleUserId,
+        technicalReport,
+        new Date().toISOString()
+      );
     },
     findEmployeeByName(name) {
       return db.prepare('SELECT id FROM employees WHERE name=? COLLATE NOCASE').get(name);
@@ -103,7 +103,7 @@ function createImportsRepository(db) {
           `INSERT INTO assets
           (hostname,equipment_type,manufacturer,model,serial,description,imei1,imei2,
           apple_id,reference,condition_text,city,location,activated_at,replaced_at,status)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'backup')`
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DISPONIVEL')`
         )
         .run(
           input.hostname,
@@ -123,12 +123,11 @@ function createImportsRepository(db) {
           input.replacedAt
         ).lastInsertRowid;
     },
-    assignLegacyAsset(assetId, employeeId) {
-      db.prepare('INSERT INTO assignments(asset_id,employee_id) VALUES(?,?)').run(
-        assetId,
-        employeeId
-      );
-      db.prepare("UPDATE assets SET status='assigned' WHERE id=?").run(assetId);
+    assignLegacyAsset(assetId, employeeId, responsibleUserId) {
+      db.prepare(
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId);
+      db.prepare("UPDATE assets SET status='EM_USO' WHERE id=?").run(assetId);
     },
     findLegacyAsset(value) {
       return db.prepare('SELECT id FROM assets WHERE serial=? OR hostname=?').get(value, value);
@@ -137,7 +136,7 @@ function createImportsRepository(db) {
       db.prepare(
         `INSERT INTO tickets
         (ticket_number,employee_id,asset_id,type,priority,description,status,
-        technical_opinion,opened_at,closed_at) VALUES(?,?,?,?,?,?,?,?,?,?)`
+        technical_opinion,opened_at,closed_at,responsible_user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`
       ).run(
         input.ticketNumber,
         input.employeeId,
@@ -148,7 +147,8 @@ function createImportsRepository(db) {
         input.status,
         input.technicalOpinion,
         input.openedAt,
-        input.closedAt
+        input.closedAt,
+        input.responsibleUserId
       );
     }
   };

@@ -1,7 +1,7 @@
 function createAssetsRepository(db) {
   return {
     list(query, status) {
-      let sql = `SELECT a.*,e.id employee_id,e.name employee_name
+      let sql = `SELECT a.*,e.id employee_id,e.name employee_name,e.department employee_department
         FROM assets a
         LEFT JOIN assignments s ON s.asset_id=a.id AND s.returned_at IS NULL
         LEFT JOIN employees e ON e.id=s.employee_id WHERE 1=1`;
@@ -19,7 +19,13 @@ function createAssetsRepository(db) {
       return db.prepare(sql).all(...params);
     },
     findById(id) {
-      return db.prepare('SELECT * FROM assets WHERE id=?').get(id);
+      return db
+        .prepare(
+          `SELECT a.*,e.department employee_department FROM assets a
+          LEFT JOIN assignments s ON s.asset_id=a.id AND s.returned_at IS NULL
+          LEFT JOIN employees e ON e.id=s.employee_id WHERE a.id=?`
+        )
+        .get(id);
     },
     create(input) {
       const result = db

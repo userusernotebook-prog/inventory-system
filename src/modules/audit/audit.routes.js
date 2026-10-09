@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { validate } = require('../../shared/middlewares/validate');
-const { requireAdmin } = require('../../shared/middlewares/auth');
+const { requirePermission } = require('../../shared/middlewares/auth');
 const { createAuditController } = require('./audit.controller');
 const schema = require('./audit.schema');
 
@@ -9,7 +9,7 @@ function createAuditRoutes(auditService, authService) {
   const controller = createAuditController(auditService);
   router.get(
     '/api/admin/audit',
-    requireAdmin(authService),
+    ...requirePermission(authService, 'audit:read'),
     validate(schema.query, 'query'),
     controller.list
   );

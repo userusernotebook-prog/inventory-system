@@ -2,10 +2,10 @@ function createDashboardRepository(db) {
   function summary() {
     const counts = {
       employees: db.prepare("SELECT COUNT(*) c FROM employees WHERE status='active'").get().c,
-      assigned: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='assigned'").get().c,
-      backup: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='backup'").get().c,
-      maintenance: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='maintenance'").get().c,
-      retired: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='retired'").get().c,
+      assigned: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='EM_USO'").get().c,
+      backup: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='BACKUP'").get().c,
+      maintenance: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='EM_MANUTENCAO'").get().c,
+      retired: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='DESATIVADO'").get().c,
       openTickets: db
         .prepare("SELECT COUNT(*) c FROM tickets WHERE status IN ('open','in_progress')")
         .get().c
@@ -22,9 +22,9 @@ function createDashboardRepository(db) {
       .all();
     const recentMovements = db
       .prepare(
-        `SELECT m.*,a.hostname,a.serial,a.equipment_type,t.name technician,
+        `SELECT m.*,a.hostname,a.serial,a.equipment_type,u.name responsible_user,
     ef.name employee_from,et.name employee_to FROM movements m JOIN assets a ON a.id=m.asset_id
-    LEFT JOIN technicians t ON t.id=m.technician_id LEFT JOIN employees ef ON ef.id=m.employee_from_id
+    LEFT JOIN users u ON u.id=m.responsible_user_id LEFT JOIN employees ef ON ef.id=m.employee_from_id
     LEFT JOIN employees et ON et.id=m.employee_to_id ORDER BY m.created_at DESC LIMIT 10`
       )
       .all();
@@ -67,9 +67,9 @@ function createDashboardRepository(db) {
 
     const summary = {
       employeesActive: db.prepare("SELECT COUNT(*) n FROM employees WHERE status='active'").get().n,
-      assetsManaged: db.prepare("SELECT COUNT(*) n FROM assets WHERE status<>'retired'").get().n,
+      assetsManaged: db.prepare("SELECT COUNT(*) n FROM assets WHERE status<>'DESATIVADO'").get().n,
       techniciansActive: db
-        .prepare("SELECT COUNT(*) n FROM technicians WHERE active=1 AND role='technician'")
+        .prepare("SELECT COUNT(*) n FROM users WHERE active=1 AND profile_base='TECNICO'")
         .get().n,
       ticketsTotal: db.prepare('SELECT COUNT(*) n FROM tickets').get().n,
       ticketsOpen: db

@@ -1,5 +1,6 @@
 const { readRows } = require('../../shared/utils/workbook-reader');
 const { ValidationError } = require('../../shared/errors');
+const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
 
 const clean = (value) => (value == null ? '' : String(value).trim());
 const key = (value) =>
@@ -54,13 +55,16 @@ function dateOnly(value, sheet, line, label) {
 }
 
 const assetStatuses = {
-  EMUSO: 'assigned',
-  BACKUP: 'backup',
-  MANUTENCAO: 'maintenance',
-  DESATIVADO: 'retired'
+  DISPONIVEL: ASSET_STATES.AVAILABLE,
+  EMUSO: ASSET_STATES.IN_USE,
+  BACKUP: ASSET_STATES.BACKUP,
+  MANUTENCAO: ASSET_STATES.UNDER_MAINTENANCE,
+  EMAVALIACAO: ASSET_STATES.UNDER_EVALUATION,
+  PENDENTEDEVOLUCAO: ASSET_STATES.RETURN_PENDING,
+  DESATIVADO: ASSET_STATES.DEACTIVATED
 };
 
-function importTemplate(repository, workbook) {
+function importTemplate(repository, workbook, responsibleUserId) {
   const employees = readSheet(workbook, 'Funcionarios', ['CÓDIGO', 'NOME', 'STATUS']);
   const assets = readSheet(workbook, 'Ativos', [
     'CÓDIGO FUNCIONÁRIO',
@@ -73,7 +77,6 @@ function importTemplate(repository, workbook) {
     throw new ValidationError('Preencha ao menos uma linha nas abas Funcionarios ou Ativos.');
   }
 
-  const technicianId = repository.activeAdminId();
   const employeeIds = new Map();
   const seenCodes = new Set();
   const seenSerials = new Set();
@@ -157,6 +160,7 @@ function importTemplate(repository, workbook) {
     const employeeCode = field(row, 'CÓDIGO FUNCIONÁRIO');
     const status = assetStatuses[key(field(row, 'STATUS'))];
     const reason = field(row, 'MOTIVO / OBSERVAÇÃO');
+    const technicalReport = field(row, 'LAUDO TÉCNICO');
     if (!type || !status) {
       throw new ValidationError(
         `Ativos, linha ${row.line}: informe EQUIPAMENTO e um STATUS válido.`
@@ -165,19 +169,19 @@ function importTemplate(repository, workbook) {
     if (!serial && !reference) {
       throw new ValidationError(`Ativos, linha ${row.line}: informe SERIAL ou REFERÊNCIA única.`);
     }
-    if (status === 'assigned' && !employeeCode) {
+    if (status === ASSET_STATES.IN_USE && !employeeCode) {
       throw new ValidationError(
         `Ativos, linha ${row.line}: equipamento Em uso precisa de CÓDIGO FUNCIONÁRIO.`
       );
     }
-    if (status !== 'assigned' && employeeCode) {
+    if (status !== ASSET_STATES.IN_USE && employeeCode) {
       throw new ValidationError(
         `Ativos, linha ${row.line}: deixe CÓDIGO FUNCIONÁRIO vazio quando não estiver Em uso.`
       );
     }
-    if (status === 'retired' && !reason) {
+    if (status === ASSET_STATES.DEACTIVATED && (!reason || !technicalReport)) {
       throw new ValidationError(
-        `Ativos, linha ${row.line}: informe o MOTIVO / OBSERVAÇÃO da desativação.`
+        `Ativos, linha ${row.line}: a desativação exige MOTIVO / OBSERVAÇÃO e LAUDO TÉCNICO.`
       );
     }
 
@@ -199,7 +203,7 @@ function importTemplate(repository, workbook) {
     }
 
     let employeeId = null;
-    if (status === 'assigned') {
+    if (status === ASSET_STATES.IN_USE) {
       let employee = employeeIds.get(key(employeeCode));
       if (!employee) {
         const matches = repository.employeesByCode(employeeCode);
@@ -233,15 +237,16 @@ function importTemplate(repository, workbook) {
       city: field(row, 'CIDADE') || null,
       location: field(row, 'LOCALIDADE') || null,
       status,
-      retirementReason: status === 'retired' ? reason : null
+      retirementReason: status === ASSET_STATES.DEACTIVATED ? reason : null
     });
-    if (employeeId) repository.insertAssignment(id, employeeId, technicianId);
+    if (employeeId) repository.insertAssignment(id, employeeId, responsibleUserId);
     repository.insertInitialMovement(
       id,
       employeeId,
       status,
       reason || 'Importação inicial',
-      technicianId
+      technicalReport || null,
+      responsibleUserId
     );
     createdAssets++;
   }

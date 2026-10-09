@@ -7,16 +7,22 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "backup": "node scripts/backup.js",
+    "db:rollback": "node scripts/rollback-migration.js",
+    "create-admin": "node scripts/create-admin.js",
+    "reset-admin": "node scripts/reset-admin.js",
     "test": "node --test",
     "lint": "eslint .",
     "format": "prettier --write \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json",
     "format:check": "prettier --check \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
     "better-sqlite3": "^11.8.1",
     "dotenv": "18.0.6",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.1",
     "multer": "^2.0.0",
+    "otplib": "^13.5.0",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
   },

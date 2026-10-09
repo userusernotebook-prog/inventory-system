@@ -1,25 +1,124 @@
 function createAuthRepository(db) {
   return {
-    countTechnicians() {
-      return db.prepare('SELECT COUNT(*) c FROM technicians').get().c;
+    findByEmail(email) {
+      return db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE').get(email);
     },
-    seedTechnicians() {
-      db.prepare("INSERT INTO technicians(name, role) VALUES (?, 'admin'), (?, 'technician')").run(
-        'Administrador',
-        'Técnico 1'
+    findById(id) {
+      return db.prepare('SELECT * FROM users WHERE id=?').get(id);
+    },
+    findSession(hash) {
+      return db
+        .prepare(
+          `SELECT u.id,u.name,u.email,u.profile_base,u.active,u.must_change_password,u.totp_enabled,
+            s.id AS session_id,s.expires_at
+          FROM sessions s JOIN users u ON u.id=s.user_id
+          WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?`
+        )
+        .get(hash, new Date().toISOString());
+    },
+    createSession(hash, userId, expiresAt) {
+      db.prepare(
+        'INSERT INTO sessions(token_hash,user_id,expires_at,last_seen_at) VALUES(?,?,?,?)'
+      ).run(hash, userId, expiresAt, new Date().toISOString());
+    },
+    revokeSessions(userId) {
+      db.prepare('UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL').run(
+        new Date().toISOString(),
+        userId
       );
     },
-    findActiveById(id) {
-      return db.prepare('SELECT * FROM technicians WHERE id=? AND active=1').get(id);
+    revokeSession(sessionId) {
+      db.prepare('UPDATE sessions SET revoked_at=? WHERE id=? AND revoked_at IS NULL').run(
+        new Date().toISOString(),
+        sessionId
+      );
     },
-    listActive() {
-      return db.prepare('SELECT id,name,role FROM technicians WHERE active=1 ORDER BY name').all();
+    updateLogin(id) {
+      db.prepare(
+        'UPDATE users SET last_login_at=?,failed_login_attempts=0,locked_until=NULL WHERE id=?'
+      ).run(new Date().toISOString(), id);
     },
-    create(name, role) {
-      return db.prepare('INSERT INTO technicians(name,role) VALUES(?,?)').run(name, role)
-        .lastInsertRowid;
+    failLogin(id, attempts, lockedUntil) {
+      db.prepare('UPDATE users SET failed_login_attempts=?,locked_until=? WHERE id=?').run(
+        attempts,
+        lockedUntil,
+        id
+      );
+    },
+    rolePermissions(profile) {
+      return db
+        .prepare('SELECT permission FROM role_permissions WHERE profile_base=?')
+        .all(profile)
+        .map((r) => r.permission);
+    },
+    overrides(id) {
+      return db
+        .prepare('SELECT permission,effect FROM user_permission_overrides WHERE user_id=?')
+        .all(id);
+    },
+    scopes(id) {
+      return db.prepare('SELECT scope_type,scope_value FROM user_scopes WHERE user_id=?').all(id);
+    },
+    countAdmins() {
+      return db.prepare("SELECT COUNT(*) n FROM users WHERE profile_base='ADMIN'").get().n;
+    },
+    createUser(input) {
+      return db
+        .prepare(
+          'INSERT INTO users(name,email,password_hash,profile_base,active,must_change_password) VALUES(?,?,?,?,?,?)'
+        )
+        .run(
+          input.name,
+          input.email,
+          input.passwordHash,
+          input.profileBase,
+          input.active ? 1 : 0,
+          input.mustChangePassword ? 1 : 0
+        ).lastInsertRowid;
+    },
+    updateUser(id, input) {
+      db.prepare(
+        'UPDATE users SET name=?,email=?,profile_base=?,active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?'
+      ).run(input.name, input.email, input.profileBase, input.active ? 1 : 0, id);
+    },
+    resetPassword(id, passwordHash) {
+      db.prepare(
+        'UPDATE users SET password_hash=?,must_change_password=1,totp_enabled=0,totp_secret=NULL,failed_login_attempts=0,locked_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?'
+      ).run(passwordHash, id);
+    },
+    changePassword(id, passwordHash) {
+      db.prepare(
+        'UPDATE users SET password_hash=?,must_change_password=0,updated_at=CURRENT_TIMESTAMP WHERE id=?'
+      ).run(passwordHash, id);
+    },
+    setTotp(id, secret, enabled) {
+      db.prepare('UPDATE users SET totp_secret=?,totp_enabled=? WHERE id=?').run(
+        secret,
+        enabled ? 1 : 0,
+        id
+      );
+    },
+    setOverrides(id, rows) {
+      db.prepare('DELETE FROM user_permission_overrides WHERE user_id=?').run(id);
+      const stmt = db.prepare(
+        'INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?,?,?)'
+      );
+      for (const row of rows) stmt.run(id, row.permission, row.effect);
+    },
+    setScopes(id, rows) {
+      db.prepare('DELETE FROM user_scopes WHERE user_id=?').run(id);
+      const stmt = db.prepare(
+        'INSERT INTO user_scopes(user_id,scope_type,scope_value) VALUES(?,?,?)'
+      );
+      for (const row of rows) stmt.run(id, row.type, row.value);
+    },
+    listUsers() {
+      return db
+        .prepare(
+          'SELECT id,name,email,profile_base,active,last_login_at,must_change_password,totp_enabled FROM users ORDER BY name'
+        )
+        .all();
     }
   };
 }
-
 module.exports = { createAuthRepository };

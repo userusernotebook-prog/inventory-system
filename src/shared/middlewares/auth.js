@@ -1,22 +1,63 @@
-const { ValidationError, UnauthorizedError } = require('../errors');
+const { ForbiddenError, UnauthorizedError } = require('../errors');
 
-function requireTechnician(authService) {
+function readCookie(req, name) {
+  const entry = (req.header('cookie') || '')
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(`${name}=`));
+  return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null;
+}
+function requireAuthentication(authService) {
   return (req, res, next) => {
-    const technician = authService.findActiveTechnician(Number(req.header('x-technician-id')));
-    if (!technician) return next(new ValidationError('Selecione o técnico responsável.'));
-    req.tech = technician;
+    const token =
+      readCookie(req, 'session') || (req.header('authorization') || '').replace(/^Bearer\s+/, '');
+    const user = authService.authenticate(token);
+    if (!user) return next(new UnauthorizedError());
+    req.user = user;
     next();
   };
 }
 
-function requireAdmin(authService) {
-  return (req, res, next) => {
-    const token = (req.header('authorization') || '').replace(/^Bearer\s+/, '');
-    if (!authService.hasValidToken(token)) {
-      return next(new UnauthorizedError());
+function requireCompletedOnboarding(req, res, next) {
+  const requiresTotp = req.user.profile_base === 'ADMIN' && !req.user.totp_enabled;
+  if (req.user.must_change_password || requiresTotp) {
+    return next(
+      new ForbiddenError(
+        'Conclua a troca de senha e a configuraÃ§Ã£o do 2FA antes de acessar o sistema.'
+      )
+    );
+  }
+  return next();
+}
+function requirePermission(authService, permission) {
+  return [
+    requireAuthentication(authService),
+    (req, res, next) => {
+      try {
+        authService.authorize(req.user, permission);
+        next();
+      } catch (error) {
+        next(error);
+      }
     }
-    next();
-  };
+  ];
 }
-
-module.exports = { requireTechnician, requireAdmin };
+function requireOnboarding(authService) {
+  return [
+    requireAuthentication(authService),
+    (req, res, next) => {
+      if (
+        !req.user.must_change_password &&
+        !(req.user.profile_base === 'ADMIN' && !req.user.totp_enabled)
+      )
+        return next(new ForbiddenError('Conclua a troca de senha e a configuração do 2FA.'));
+      next();
+    }
+  ];
+}
+module.exports = {
+  requireAuthentication,
+  requireCompletedOnboarding,
+  requirePermission,
+  requireOnboarding
+};

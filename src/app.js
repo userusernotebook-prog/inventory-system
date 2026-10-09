@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('node:path');
-const { adminPassword } = require('./config/env');
 const { errorHandler } = require('./shared/middlewares/error-handler');
+const { requireAuthentication, requireCompletedOnboarding } = require('./shared/middlewares/auth');
 
 const { createAuthRepository } = require('./modules/auth/auth.repository');
 const { createAuthService } = require('./modules/auth/auth.service');
@@ -33,39 +33,49 @@ const { createDashboardRoutes } = require('./modules/dashboard/dashboard.routes'
 
 // No Node 24/Windows, carregue os módulos JS antes de abrir o addon SQLite.
 const db = require('./db/connection');
-const authService = createAuthService(createAuthRepository(db), adminPassword);
 const auditService = createAuditService(createAuditRepository(db));
+const authService = createAuthService(createAuthRepository(db), auditService);
 const employeesRepository = createEmployeesRepository(db);
 const assetsRepository = createAssetsRepository(db);
 const assignmentsRepository = createAssignmentsRepository(db);
 const movementsRepository = createMovementsRepository(db);
 
-const employeesService = createEmployeesService(db, employeesRepository, auditService);
-const assetsService = createAssetsService(db, assetsRepository, auditService);
+const employeesService = createEmployeesService(db, employeesRepository, auditService, authService);
+const assetsService = createAssetsService(db, assetsRepository, auditService, authService);
 const movementsService = createMovementsService(
   db,
   assetsRepository,
   employeesRepository,
   assignmentsRepository,
   movementsRepository,
-  auditService
+  auditService,
+  authService
 );
 const assignmentsService = createAssignmentsService(
   db,
   assignmentsRepository,
   employeesRepository,
   movementsService,
-  auditService
+  auditService,
+  authService
 );
-const ticketsService = createTicketsService(db, createTicketsRepository(db), auditService);
+const ticketsService = createTicketsService(
+  db,
+  createTicketsRepository(db),
+  auditService,
+  employeesRepository,
+  authService
+);
 const importsService = createImportsService(db, createImportsRepository(db), auditService);
 const dashboardService = createDashboardService(createDashboardRepository(db));
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(createAuthRoutes(authService));
+app.use('/api', requireAuthentication(authService));
+app.use('/api', requireCompletedOnboarding);
 app.use(createAuditRoutes(auditService, authService));
-app.use(createDashboardRoutes(dashboardService));
+app.use(createDashboardRoutes(dashboardService, authService));
 app.use(createEmployeesRoutes(employeesService, authService));
 app.use(createAssetsRoutes(assetsService, authService));
 app.use(createMovementsRoutes(movementsService, authService));

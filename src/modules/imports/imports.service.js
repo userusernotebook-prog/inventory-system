@@ -7,7 +7,7 @@ const { importLegacy } = require('./legacy.service');
 
 function createImportsService(db, repository, auditService) {
   return {
-    importExcel(file) {
+    importExcel(file, user) {
       if (!file) throw new ValidationError('Selecione uma planilha Excel.');
       let newTemplate = false;
       try {
@@ -29,8 +29,8 @@ function createImportsService(db, repository, auditService) {
         );
         return db.transaction(() => {
           const result = newTemplate
-            ? importTemplate(repository, workbook)
-            : importLegacy(repository, workbook);
+            ? importTemplate(repository, workbook, user.id)
+            : importLegacy(repository, workbook, user.id);
           const details = {
             employees: result.employees,
             assets: result.assets,
@@ -38,7 +38,7 @@ function createImportsService(db, repository, auditService) {
             skipped: result.skipped,
             filename: file.originalname
           };
-          auditService.log('Administrador', 'import', 'excel', null, details);
+          auditService.logUser(user, 'import', 'excel', null, { after: details });
           return result;
         })();
       } catch (error) {

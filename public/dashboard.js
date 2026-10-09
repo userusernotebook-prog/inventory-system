@@ -9,10 +9,13 @@ let dashboardFilters = {
 };
 let dashboardRequest = 0;
 const dashboardAssetStatus = {
-  assigned: 'Em uso',
-  backup: 'Backup',
-  maintenance: 'Manutenção',
-  retired: 'Desativado'
+  DISPONIVEL: 'Disponível',
+  EM_USO: 'Em uso',
+  PENDENTE_DEVOLUCAO: 'Pendente de devolução',
+  EM_AVALIACAO: 'Em avaliação',
+  BACKUP: 'Backup',
+  EM_MANUTENCAO: 'Manutenção',
+  DESATIVADO: 'Desativado'
 };
 const dashboardTicketStatus = {
   open: 'Aberto',
@@ -148,7 +151,7 @@ function dashboardSummary(report) {
 function dashboardAssets(report) {
   const a = report.assets;
   const counts = Object.fromEntries(a.byStatus.map((row) => [row.label, row.n]));
-  return `${dashboardFiltersHtml(report)}<div class='dash-metrics'>${dashboardMetric('Ativos no filtro', a.total, 'equipamentos encontrados')}${dashboardMetric('Em uso', counts.assigned, 'atribuídos')}${dashboardMetric('Backup', counts.backup, 'disponíveis')}${dashboardMetric('Manutenção', counts.maintenance, 'em atendimento')}${dashboardMetric('Desativados', counts.retired, 'fora de uso')}</div><div class='dash-grid'>${dashboardPanel('Ativos por equipamento', dashboardBars(a.byType))}${dashboardPanel('Situação dos ativos', dashboardDonut(a.byStatus, dashboardAssetStatus))}</div><div class='dash-grid'>${dashboardPanel('Ativos atualizados recentemente', dashboardRecentAssets(a.recent), 'dash-wide')}</div>`;
+  return `${dashboardFiltersHtml(report)}<div class='dash-metrics'>${dashboardMetric('Ativos no filtro', a.total, 'equipamentos encontrados')}${dashboardMetric('Em uso', counts.EM_USO, 'atribuídos')}${dashboardMetric('Backup', counts.BACKUP, 'reserva operacional')}${dashboardMetric('Manutenção', counts.EM_MANUTENCAO, 'em atendimento')}${dashboardMetric('Desativados', counts.DESATIVADO, 'fora de uso')}</div><div class='dash-grid'>${dashboardPanel('Ativos por equipamento', dashboardBars(a.byType))}${dashboardPanel('Situação dos ativos', dashboardDonut(a.byStatus, dashboardAssetStatus))}</div><div class='dash-grid'>${dashboardPanel('Ativos atualizados recentemente', dashboardRecentAssets(a.recent), 'dash-wide')}</div>`;
 }
 function dashboardTickets(report) {
   const t = report.tickets;

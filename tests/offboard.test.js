@@ -6,6 +6,7 @@ const net = require('node:net');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const Database = require('better-sqlite3');
+const argon2 = require('argon2');
 
 const projectDir = path.resolve(__dirname, '..');
 
@@ -36,7 +37,7 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
   const port = await freePort();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: testDir,
-    env: { ...process.env, PORT: String(port), ADMIN_PASSWORD: 'senha-de-teste' },
+    env: { ...process.env, PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   });
@@ -45,12 +46,18 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
   let serverErrors = '';
   child.stderr.on('data', (chunk) => (serverErrors += chunk));
 
+  let sessionCookie = '';
   async function request(route, method = 'GET', body) {
     const response = await fetch(`http://127.0.0.1:${port}${route}`, {
       method,
-      headers: { 'content-type': 'application/json', 'x-technician-id': '1' },
+      headers: {
+        'content-type': 'application/json',
+        ...(sessionCookie ? { cookie: sessionCookie } : {})
+      },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) sessionCookie = setCookie.split(';')[0];
     return { status: response.status, data: await response.json() };
   }
 
@@ -70,6 +77,37 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
       ready,
       `o servidor de teste deve iniciar (exit=${child.exitCode}): ${serverOutput} ${serverErrors}`
     );
+
+    const bootstrap = new Database(path.join(testDir, 'data', 'inventory.db'));
+    try {
+      bootstrap
+        .prepare(
+          "INSERT INTO users(name,email,password_hash,profile_base,must_change_password) VALUES(?,?,?,'TECNICO',0)"
+        )
+        .run('Técnico', 'tecnico@example.test', await argon2.hash('SenhaDeTesteForte1'));
+      const userId = bootstrap
+        .prepare("SELECT id FROM users WHERE email='tecnico@example.test'")
+        .get().id;
+      const grant = bootstrap.prepare(
+        "INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?,?,'allow')"
+      );
+      for (const permission of [
+        'employee:create',
+        'employee:update',
+        'employee:offboard',
+        'asset:assign',
+        'asset:send-backup',
+        'asset:send-maintenance'
+      ])
+        grant.run(userId, permission);
+    } finally {
+      bootstrap.close();
+    }
+    const login = await request('/api/auth/login', 'POST', {
+      email: 'tecnico@example.test',
+      password: 'SenhaDeTesteForte1'
+    });
+    assert.equal(login.status, 200);
 
     const employee = (await request('/api/employees', 'POST', { name: 'Pessoa de teste' })).data.id;
     const first = (
@@ -100,7 +138,7 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
     const control = new Database(path.join(testDir, 'data', 'inventory.db'));
     try {
       control.exec(`CREATE TRIGGER fail_second_move BEFORE INSERT ON movements
-        WHEN NEW.asset_id=${second} AND NEW.to_status='maintenance'
+        WHEN NEW.asset_id=${second} AND NEW.to_status='EM_MANUTENCAO'
         BEGIN SELECT RAISE(ABORT, 'Falha simulada'); END`);
       const interrupted = await request(`/api/employees/${employee}/offboard`, 'POST', {
         decisions: {
@@ -119,7 +157,7 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
       );
       assert.equal(
         control
-          .prepare("SELECT COUNT(*) n FROM movements WHERE to_status IN ('backup','maintenance')")
+          .prepare("SELECT COUNT(*) n FROM movements WHERE to_status IN ('BACKUP','EM_MANUTENCAO')")
           .get().n,
         0
       );
@@ -138,11 +176,9 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
     assert.equal(completed.data.moved, 2);
     assert.equal((await request(`/api/employees/${employee}/assets`)).data.length, 0);
 
-    const token = (await request('/api/admin/login', 'POST', { password: 'senha-de-teste' })).data
-      .token;
     const updatedDate = await fetch(`http://127.0.0.1:${port}/api/employees/${employee}`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      headers: { 'content-type': 'application/json', cookie: sessionCookie },
       body: JSON.stringify({ offboarded_at: '2026-09-30' })
     });
     assert.equal(updatedDate.status, 200);
@@ -160,14 +196,14 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
       );
       assert.equal(
         db
-          .prepare("SELECT COUNT(*) n FROM movements WHERE to_status IN ('backup','maintenance')")
+          .prepare("SELECT COUNT(*) n FROM movements WHERE to_status IN ('BACKUP','EM_MANUTENCAO')")
           .get().n,
         2
       );
-      assert.equal(db.prepare('SELECT status FROM assets WHERE id=?').get(first).status, 'backup');
+      assert.equal(db.prepare('SELECT status FROM assets WHERE id=?').get(first).status, 'BACKUP');
       assert.equal(
         db.prepare('SELECT status FROM assets WHERE id=?').get(second).status,
-        'maintenance'
+        'EM_MANUTENCAO'
       );
     } finally {
       db.close();

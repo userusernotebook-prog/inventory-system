@@ -1,18 +1,20 @@
 const { NotFoundError, ValidationError } = require('../../shared/errors');
 const { text, optionalDate } = require('../../shared/utils/text');
 
-function createEmployeesService(db, repository, auditService) {
+function createEmployeesService(db, repository, auditService, authService) {
   return {
-    list(query) {
-      return repository.list(text(query));
+    list(query, user) {
+      return authService.filterByScope(user, repository.list(text(query)));
     },
-    get(id) {
+    get(id, user) {
       const employee = repository.findById(id);
       if (!employee) throw new NotFoundError('Funcionário não encontrado.');
+      authService.assertScope(user, employee);
       return employee;
     },
     create(body, technician) {
       if (!text(body.name)) throw new ValidationError('Nome é obrigatório.');
+      authService.assertScope(technician, body);
       return db.transaction(() => {
         const id = repository.create({
           code: text(body.code),
@@ -25,13 +27,16 @@ function createEmployeesService(db, repository, auditService) {
           personal_phone: text(body.personal_phone),
           status: body.status === 'inactive' ? 'inactive' : 'active'
         });
-        auditService.log(technician.name, 'create', 'employee', id, body);
+        auditService.logUser(technician, 'create', 'employee', id, {
+          after: { name: text(body.name), city: text(body.city), department: text(body.department) }
+        });
         return { id };
       })();
     },
-    update(id, body) {
+    update(id, body, user) {
       const current = repository.findById(id);
       if (!current) throw new NotFoundError('Funcionário não encontrado.');
+      authService.assertScope(user, current);
       if (body.status !== undefined && body.status !== current.status) {
         throw new ValidationError('Altere o status pelo fluxo de desligamento.');
       }
@@ -52,6 +57,7 @@ function createEmployeesService(db, repository, auditService) {
         updated[field] = Object.hasOwn(body, field) ? text(body[field]) : current[field];
       }
       if (!updated.name) throw new ValidationError('Nome é obrigatório.');
+      authService.assertScope(user, updated);
       updated.hire_date = Object.hasOwn(body, 'hire_date')
         ? optionalDate(body.hire_date, 'Data de admissão')
         : current.hire_date;
@@ -71,7 +77,13 @@ function createEmployeesService(db, repository, auditService) {
       }
       db.transaction(() => {
         repository.update(current.id, updated);
-        auditService.log('Administrador', 'update', 'employee', current.id, updated);
+        const changes = Object.fromEntries(
+          Object.entries(updated).filter(([field, value]) => current[field] !== value)
+        );
+        auditService.logUser(user, 'update', 'employee', current.id, {
+          before: Object.fromEntries(Object.keys(changes).map((field) => [field, current[field]])),
+          after: changes
+        });
       })();
       return { ok: true };
     }

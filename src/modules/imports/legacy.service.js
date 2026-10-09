@@ -34,7 +34,7 @@ function col(row, ...names) {
   return null;
 }
 
-function importLegacy(repository, workbook) {
+function importLegacy(repository, workbook, responsibleUserId) {
   let employees = 0;
   let assets = 0;
   let tickets = 0;
@@ -106,7 +106,7 @@ function importLegacy(repository, workbook) {
           };
           employees++;
         }
-        repository.assignLegacyAsset(assetId, employee.id);
+        repository.assignLegacyAsset(assetId, employee.id, responsibleUserId);
       }
     } catch (error) {
       skipped++;
@@ -136,7 +136,8 @@ function importLegacy(repository, workbook) {
       status: norm(col(row, 'STATUS')).includes('FECH') ? 'closed' : 'open',
       technicalOpinion: col(row, 'PARECER TÉCNICO'),
       openedAt: col(row, 'DATA ABERTURA') || new Date().toISOString(),
-      closedAt: col(row, 'DATA FECHAMENTO')
+      closedAt: col(row, 'DATA FECHAMENTO'),
+      responsibleUserId
     });
     tickets++;
   }

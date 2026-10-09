@@ -2,7 +2,7 @@ const path = require('node:path');
 const { Router } = require('express');
 const multer = require('multer');
 const { validate } = require('../../shared/middlewares/validate');
-const { requireAdmin } = require('../../shared/middlewares/auth');
+const { requirePermission } = require('../../shared/middlewares/auth');
 const { createImportsController } = require('./imports.controller');
 const schema = require('./imports.schema');
 
@@ -14,10 +14,14 @@ const upload = multer({
 function createImportsRoutes(service, authService) {
   const router = Router();
   const controller = createImportsController(service);
-  router.get('/api/templates/initial', controller.downloadTemplate);
+  router.get(
+    '/api/templates/initial',
+    ...requirePermission(authService, 'asset:create'),
+    controller.downloadTemplate
+  );
   router.post(
     '/api/import/excel',
-    requireAdmin(authService),
+    ...requirePermission(authService, 'asset:create'),
     upload.single('file'),
     validate(schema.file, 'file'),
     controller.importExcel

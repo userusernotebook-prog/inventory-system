@@ -1,5 +1,6 @@
 const { ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
+const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
 
 function createDashboardService(repository) {
   return {
@@ -25,10 +26,7 @@ function createDashboardService(repository) {
       ) {
         throw new ValidationError('Status de chamado inválido.');
       }
-      if (
-        filters.assetStatus &&
-        !['assigned', 'backup', 'maintenance', 'retired'].includes(filters.assetStatus)
-      ) {
+      if (filters.assetStatus && !Object.values(ASSET_STATES).includes(filters.assetStatus)) {
         throw new ValidationError('Status de ativo inválido.');
       }
       return repository.report(filters);

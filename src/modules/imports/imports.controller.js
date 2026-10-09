@@ -10,7 +10,7 @@ function createImportsController(service) {
       });
     },
     importExcel(req, res) {
-      res.json(service.importExcel(req.validated.file));
+      res.json(service.importExcel(req.validated.file, req.user));
     }
   };
 }

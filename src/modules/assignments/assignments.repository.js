@@ -8,12 +8,10 @@ function createAssignmentsRepository(db) {
     close(id) {
       db.prepare('UPDATE assignments SET returned_at=CURRENT_TIMESTAMP WHERE id=?').run(id);
     },
-    create(assetId, employeeId, technicianId) {
-      db.prepare('INSERT INTO assignments(asset_id,employee_id,technician_id) VALUES(?,?,?)').run(
-        assetId,
-        employeeId,
-        technicianId
-      );
+    create(assetId, employeeId, responsibleUserId) {
+      db.prepare(
+        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id) VALUES(?,?,?)'
+      ).run(assetId, employeeId, responsibleUserId);
     },
     listEmployeeAssets(employeeId) {
       return db

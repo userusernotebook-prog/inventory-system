@@ -7,17 +7,32 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div id="techModal" class="modal">
+    <div id="loginModal" class="modal">
       <div class="modal-card">
-        <h2>Quem está realizando a movimentação?</h2>
-        <p>Selecione o técnico. Não é necessário login para operação diária.</p>
-        <select id="techSelect"></select
-        ><button id="chooseTech">Entrar no sistema</button>
+        <h2>Acessar o sistema</h2>
+        <p>Informe seu e-mail corporativo e sua senha.</p>
+        <form id="loginForm">
+          <input
+            id="loginEmail"
+            type="email"
+            placeholder="E-mail"
+            autocomplete="username"
+            required
+          />
+          <input
+            id="loginPassword"
+            type="password"
+            placeholder="Senha"
+            autocomplete="current-password"
+            required
+          />
+          <input id="loginTotp" placeholder="Código 2FA, se solicitado" inputmode="numeric" />
+          <button type="submit">Entrar</button>
+        </form>
       </div>
     </div>
     <header>
       <div><strong>Gestão de Ativos</strong><span id="actorBadge"></span></div>
-      <button class="ghost" id="adminBtn">Administrador</button>
     </header>
     <div class="layout">
       <aside>

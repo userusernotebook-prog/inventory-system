@@ -1,15 +1,17 @@
 const { ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
+const { ASSET_STATES } = require('./domain/asset-state-machine');
 
-function createAssetsService(db, repository, auditService) {
+function createAssetsService(db, repository, auditService, authService) {
   return {
-    list(query, status) {
-      return repository.list(text(query), text(status));
+    list(query, status, user) {
+      return authService.filterByScope(user, repository.list(text(query), text(status)));
     },
     create(body, technician) {
       if (!text(body.equipment_type)) {
         throw new ValidationError('Tipo de equipamento é obrigatório.');
       }
+      authService.assertScope(technician, body);
       try {
         return db.transaction(() => {
           const input = {};
@@ -32,11 +34,13 @@ function createAssetsService(db, repository, auditService) {
           ]) {
             input[field] = text(body[field]);
           }
-          input.status = ['assigned', 'backup', 'maintenance', 'retired'].includes(body.status)
-            ? body.status
-            : 'backup';
+          // O cadastro cria um ativo disponível. Toda mudança posterior de estado
+          // passa obrigatoriamente pela máquina de estados no módulo movements.
+          input.status = ASSET_STATES.AVAILABLE;
           const id = repository.create(input);
-          auditService.log(technician.name, 'create', 'asset', id, body);
+          auditService.logUser(technician, 'create', 'asset', id, {
+            after: { equipment_type: input.equipment_type, serial: input.serial, city: input.city }
+          });
           return { id };
         })();
       } catch (error) {
@@ -49,7 +53,10 @@ function createAssetsService(db, repository, auditService) {
         throw error;
       }
     },
-    update(id, body) {
+    update(id, body, user) {
+      const current = repository.findById(id);
+      if (!current) throw new ValidationError('Equipamento não encontrado.');
+      authService.assertScope(user, current);
       const input = {};
       for (const field of [
         'hostname',
@@ -68,9 +75,16 @@ function createAssetsService(db, repository, auditService) {
       ]) {
         input[field] = text(body[field]);
       }
+      authService.assertScope(user, input);
       db.transaction(() => {
         repository.update(id, input);
-        auditService.log('Administrador', 'update', 'asset', id, body);
+        const changes = Object.fromEntries(
+          Object.entries(input).filter(([field, value]) => current[field] !== value)
+        );
+        auditService.logUser(user, 'update', 'asset', id, {
+          before: Object.fromEntries(Object.keys(changes).map((field) => [field, current[field]])),
+          after: changes
+        });
       })();
       return { ok: true };
     }

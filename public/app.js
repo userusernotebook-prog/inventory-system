@@ -1,5 +1,4 @@
-let technician = JSON.parse(sessionStorage.getItem('technician') || 'null');
-let adminToken = sessionStorage.getItem('adminToken') || '';
+let currentUser = null;
 const app = document.querySelector('#app'),
   toast = document.querySelector('#toast');
 const esc = (s) =>
@@ -18,47 +17,41 @@ async function api(url, opt = {}) {
     'content-type': opt.body instanceof FormData ? undefined : 'application/json'
   };
   if (!opt.headers['content-type']) delete opt.headers['content-type'];
-  if (technician) opt.headers['x-technician-id'] = technician.id;
-  if (adminToken) opt.headers.authorization = 'Bearer ' + adminToken;
+  opt.credentials = 'same-origin';
   const r = await fetch(url, opt);
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || 'Erro');
   return d;
 }
-async function loadTech() {
-  const ts = await api('/api/technicians');
-  techSelect.innerHTML = ts
-    .map((t) => `<option value='${t.id}' data-name='${esc(t.name)}'>${esc(t.name)}</option>`)
-    .join('');
-  if (technician) {
-    techModal.classList.add('hidden');
-    actorBadge.textContent = '• ' + technician.name;
-  } else techModal.classList.remove('hidden');
+function hasPermission(permission) {
+  const permissions = currentUser?.permissions || { granted: [], denied: [] };
+  return (
+    !permissions.denied.includes(permission) &&
+    !permissions.denied.includes('*:*') &&
+    (permissions.granted.includes('*:*') || permissions.granted.includes(permission))
+  );
 }
-chooseTech.onclick = () => {
-  const o = techSelect.selectedOptions[0];
-  technician = { id: Number(o.value), name: o.dataset.name };
-  sessionStorage.setItem('technician', JSON.stringify(technician));
-  techModal.classList.add('hidden');
-  actorBadge.textContent = '• ' + technician.name;
-  dashboard();
-};
-adminBtn.onclick = async () => {
-  const p = prompt('Senha do administrador:');
-  if (!p) return;
-  try {
-    const d = await api('/api/admin/login', {
-      method: 'POST',
-      body: JSON.stringify({ password: p })
-    });
-    adminToken = d.token;
-    sessionStorage.setItem('adminToken', adminToken);
-    document.querySelectorAll('.admin-only').forEach((x) => x.classList.remove('hidden'));
-    notify('Modo administrador ativado.');
-  } catch (e) {
-    notify(e.message);
-  }
-};
+
+function updateNavigation() {
+  document
+    .querySelector('[data-page="employees"]')
+    .classList.toggle('hidden', !hasPermission('employee:read'));
+  document
+    .querySelector('[data-page="assets"]')
+    .classList.toggle('hidden', !hasPermission('asset:read'));
+  document
+    .querySelector('[data-page="move"]')
+    .classList.toggle('hidden', !hasPermission('asset:update'));
+  document
+    .querySelector('[data-page="tickets"]')
+    .classList.toggle('hidden', !hasPermission('ticket:read'));
+  document
+    .querySelector('[data-page="import"]')
+    .classList.toggle('hidden', !hasPermission('asset:create'));
+  document
+    .querySelector('[data-page="audit"]')
+    .classList.toggle('hidden', !hasPermission('audit:read'));
+}
 document.querySelectorAll('.nav').forEach(
   (b) =>
     (b.onclick = () => {
@@ -123,10 +116,6 @@ function showEmpForm() {
   };
 }
 async function showEditEmpForm(id) {
-  if (!adminToken) {
-    notify('Ative o modo administrador para editar funcionários.');
-    return;
-  }
   const employee = await api(`/api/employees/${id}`);
   const fields = [
     ['code', 'Código'],
@@ -173,14 +162,15 @@ async function offboard(id, name) {
     }
     return;
   }
-  app.innerHTML = `<h1>Desligamento: ${esc(name)}</h1><p>Defina o destino de cada equipamento antes de concluir.</p><section class=panel><div id=offs>${as.map((a) => `<div class=toolbar data-off='${a.id}'><b>${esc(a.equipment_type)} ${esc(a.hostname || a.serial)}</b><select><option value=backup>Retornar para backup</option><option value=maintenance>Enviar para manutenção</option><option value=retired>Desativar equipamento</option></select><input placeholder='Motivo / observação (obrigatório ao desativar)'></div>`).join('')}</div><button id=finishOff>Concluir desligamento</button></section>`;
+  app.innerHTML = `<h1>Desligamento: ${esc(name)}</h1><p>Defina o destino de cada equipamento antes de concluir.</p><section class=panel><div id=offs>${as.map((a) => `<div class=toolbar data-off='${a.id}'><b>${esc(a.equipment_type)} ${esc(a.hostname || a.serial)}</b><select><option value=BACKUP>Retornar para backup</option><option value=EM_MANUTENCAO>Enviar para manutenção</option><option value=DESATIVADO>Desativar equipamento</option></select><input data-reason placeholder='Motivo / observação'><input data-report placeholder='Laudo técnico (obrigatório ao desativar)'></div>`).join('')}</div><button id=finishOff>Concluir desligamento</button></section>`;
   finishOff.onclick = async () => {
     const decisions = {};
     document.querySelectorAll('[data-off]').forEach(
       (x) =>
         (decisions[x.dataset.off] = {
           status: x.querySelector('select').value,
-          reason: x.querySelector('input').value
+          reason: x.querySelector('[data-reason]').value,
+          technical_report: x.querySelector('[data-report]').value
         })
     );
     try {
@@ -197,7 +187,7 @@ async function offboard(id, name) {
 }
 async function assets() {
   const rows = await api('/api/assets');
-  app.innerHTML = `<h1>Ativos</h1><div class=toolbar><button id=newAsset>Novo ativo</button><input id=assetSearch placeholder='Funcionário, hostname, modelo, serial ou patrimônio'><select id=assetStatus><option value=''>Todos</option><option value=assigned>Em uso</option><option value=backup>Backup</option><option value=maintenance>Manutenção</option><option value=retired>Baixados</option></select></div><div id=assetList>${assetTable(rows)}</div><div id=assetForm></div>`;
+  app.innerHTML = `<h1>Ativos</h1><div class=toolbar><button id=newAsset>Novo ativo</button><input id=assetSearch placeholder='Funcionário, hostname, modelo, serial ou patrimônio'><select id=assetStatus><option value=''>Todos</option><option value=DISPONIVEL>Disponível</option><option value=EM_USO>Em uso</option><option value=PENDENTE_DEVOLUCAO>Pendente de devolução</option><option value=EM_AVALIACAO>Em avaliação</option><option value=BACKUP>Backup</option><option value=EM_MANUTENCAO>Manutenção</option><option value=DESATIVADO>Desativados</option></select></div><div id=assetList>${assetTable(rows)}</div><div id=assetForm></div>`;
   const refresh = async () =>
     (assetList.innerHTML = assetTable(
       await api(
@@ -210,15 +200,18 @@ async function assets() {
 }
 function assetTable(rows) {
   const statusName = {
-    assigned: 'Em uso',
-    backup: 'Backup',
-    maintenance: 'Manutenção',
-    retired: 'Desativado'
+    DISPONIVEL: 'Disponível',
+    EM_USO: 'Em uso',
+    PENDENTE_DEVOLUCAO: 'Pendente de devolução',
+    EM_AVALIACAO: 'Em avaliação',
+    BACKUP: 'Backup',
+    EM_MANUTENCAO: 'Manutenção',
+    DESATIVADO: 'Desativado'
   };
   return `<table><thead><tr><th>Funcionário</th><th>Hostname</th><th>Equipamento</th><th>Modelo</th><th>Serial</th><th>Patrimônio</th><th>Status</th><th>Ações</th></tr></thead><tbody>${rows.map((a) => `<tr><td>${esc(a.employee_name || '—')}</td><td>${esc(a.hostname)}</td><td>${esc(a.equipment_type)}</td><td>${esc(a.model)}</td><td>${esc(a.serial)}</td><td>${esc(a.reference)}</td><td><span class=status>${esc(statusName[a.status] || a.status)}</span></td><td><span class=click onclick='historyAsset(${a.id})'>Histórico</span></td></tr>`).join('')}</tbody></table>`;
 }
 function showAssetForm() {
-  assetForm.innerHTML = `<section class=panel><h2>Novo ativo</h2><div class=form-grid><input id=at placeholder='Tipo: Notebook, iPad, Smartphone'><input id=ah placeholder='Hostname'><input id=as placeholder='Serial'><input id=am placeholder='Modelo'><input id=af placeholder='Fabricante'><input id=ar placeholder='Patrimônio'><input id=ai1 placeholder='IMEI 1'><input id=ai2 placeholder='IMEI 2'><input id=ac placeholder='Condições de uso'><input id=acity placeholder='Cidade'><input id=aloc placeholder='Localidade'><select id=ast><option value=backup>Backup</option><option value=maintenance>Manutenção</option></select><textarea id=ades class=wide placeholder='Descrição'></textarea></div><div class=toolbar><button id=saveAsset>Salvar</button></div></section>`;
+  assetForm.innerHTML = `<section class=panel><h2>Novo ativo</h2><p class=muted>O ativo será cadastrado como disponível. Use Movimentar equipamento para alterar o estado.</p><div class=form-grid><input id=at placeholder='Tipo: Notebook, iPad, Smartphone'><input id=ah placeholder='Hostname'><input id=as placeholder='Serial'><input id=am placeholder='Modelo'><input id=af placeholder='Fabricante'><input id=ar placeholder='Patrimônio'><input id=ai1 placeholder='IMEI 1'><input id=ai2 placeholder='IMEI 2'><input id=ac placeholder='Condições de uso'><input id=acity placeholder='Cidade'><input id=aloc placeholder='Localidade'><textarea id=ades class=wide placeholder='Descrição'></textarea></div><div class=toolbar><button id=saveAsset>Salvar</button></div></section>`;
   saveAsset.onclick = async () => {
     try {
       await api('/api/assets', {
@@ -235,7 +228,6 @@ function showAssetForm() {
           condition_text: ac.value,
           city: acity.value,
           location: aloc.value,
-          status: ast.value,
           description: ades.value
         })
       });
@@ -248,31 +240,36 @@ function showAssetForm() {
 }
 async function historyAsset(id) {
   const h = await api(`/api/assets/${id}/history`);
-  app.innerHTML = `<h1>Histórico do equipamento</h1><button class=ghost onclick='assets()'>Voltar</button><section class='panel history' style='margin-top:12px'>${smallTable(h, ['created_at', 'movement_type', 'from_status', 'to_status', 'employee_from', 'employee_to', 'technician', 'reason'])}</section>`;
+  app.innerHTML = `<h1>Histórico do equipamento</h1><button class=ghost onclick='assets()'>Voltar</button><section class='panel history' style='margin-top:12px'>${smallTable(h, ['occurred_at', 'movement_type', 'from_status', 'to_status', 'employee_from', 'employee_to', 'responsible_user', 'reason', 'technical_report'])}</section>`;
 }
 async function move() {
   const as = await api('/api/assets');
   const es = await api('/api/employees');
   app.innerHTML = `<h1>Movimentar equipamento</h1><section class=panel><div class=form-grid><select id=ma><option value=''>Selecione o ativo</option>${as
-    .filter((a) => a.status !== 'retired')
+    .filter((a) => a.status !== 'DESATIVADO')
     .map(
       (a) =>
         `<option value='${a.id}'>${esc(a.equipment_type)} | ${esc(a.hostname || a.serial)} | ${esc(a.employee_name || a.status)}</option>`
     )
     .join(
       ''
-    )}</select><select id=ms><option value=assigned>Atribuir a funcionário</option><option value=backup>Enviar para backup</option><option value=maintenance>Enviar para manutenção</option><option value=retired>Dar baixa</option></select><select id=me><option value=''>Selecione o funcionário</option>${es
+    )}</select><select id=ms><option value=EM_USO>Atribuir a funcionário</option><option value=DISPONIVEL>Receber como disponível</option><option value=PENDENTE_DEVOLUCAO>Marcar devolução pendente</option><option value=BACKUP>Enviar para backup</option><option value=EM_MANUTENCAO>Enviar para manutenção</option><option value=EM_AVALIACAO>Enviar para avaliação</option><option value=DESATIVADO>Desativar</option></select><select id=me><option value=''>Selecione o funcionário</option>${es
     .filter((e) => e.status === 'active')
     .map((e) => `<option value='${e.id}'>${esc(e.name)}</option>`)
     .join(
       ''
-    )}</select><textarea id=mr class=wide placeholder='Motivo / observação'></textarea></div><div class=toolbar><button id=doMove>Registrar movimentação</button></div></section>`;
-  ms.onchange = () => me.classList.toggle('hidden', ms.value !== 'assigned');
+    )}</select><textarea id=mr class=wide placeholder='Motivo / observação'></textarea><textarea id=mt class=wide placeholder='Laudo técnico (obrigatório para desativar)'></textarea></div><div class=toolbar><button id=doMove>Registrar movimentação</button></div></section>`;
+  ms.onchange = () => me.classList.toggle('hidden', ms.value !== 'EM_USO');
   doMove.onclick = async () => {
     try {
       await api(`/api/assets/${ma.value}/move`, {
         method: 'POST',
-        body: JSON.stringify({ to_status: ms.value, employee_id: me.value, reason: mr.value })
+        body: JSON.stringify({
+          to_status: ms.value,
+          employee_id: me.value,
+          reason: mr.value,
+          technical_report: document.querySelector('#mt').value
+        })
       });
       notify('Movimentação registrada no histórico.');
       move();
@@ -322,7 +319,6 @@ async function tickets() {
 function importPage() {
   app.innerHTML = `<h1>Importar Excel</h1><p class=muted>Preencha o modelo para cadastrar funcionários e ativos em uma única importação. As datas de admissão e desligamento podem ficar vazias e ser preenchidas depois em Funcionários → Editar.</p><div class=toolbar><a class=ghost href='/api/templates/initial' download='modelo-importacao-inicial.xlsx'>Baixar modelo de importação</a></div><div class=drop><input id=file type=file accept='.xlsx'><p>Use as abas Funcionarios e Ativos do modelo. Confira os códigos e as referências antes de importar.</p><button id=sendFile>Importar</button></div><div id=impResult></div>`;
   sendFile.onclick = async () => {
-    if (!adminToken) return notify('Ative o modo Administrador primeiro.');
     if (!file.files[0]) return notify('Selecione um arquivo.');
     const fd = new FormData();
     fd.append('file', file.files[0]);
@@ -335,8 +331,77 @@ function importPage() {
   };
 }
 async function audit() {
-  if (!adminToken) return notify('Ative o modo Administrador primeiro.');
   const rows = await api('/api/admin/audit');
   app.innerHTML = `<h1>Auditoria</h1><p class=muted>Registro das alterações administrativas e operacionais.</p>${smallTable(rows, ['created_at', 'actor', 'action', 'entity_type', 'entity_id', 'details'])}`;
 }
-loadTech().then(() => dashboard());
+function showOnboarding(loginResult) {
+  const loginModal = document.querySelector('#loginModal');
+  const card = loginModal.querySelector('.modal-card');
+  if (loginResult.must_change_password) {
+    card.innerHTML = `<h2>Defina sua senha</h2><p>Esta é uma senha provisória. Crie uma senha pessoal com ao menos 12 caracteres.</p><form id="changePasswordForm"><input id="newPassword" type="password" placeholder="Nova senha" minlength="12" required><button type="submit">Salvar senha</button></form>`;
+    document.querySelector('#changePasswordForm').onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api('/api/auth/change-password', {
+          method: 'POST',
+          body: JSON.stringify({ password: document.querySelector('#newPassword').value })
+        });
+        const user = await api('/api/auth/me');
+        showOnboarding({
+          must_change_password: user.must_change_password,
+          requires_totp_enrollment: user.profile_base === 'ADMIN' && !user.totp_enabled
+        });
+      } catch (error) {
+        notify(error.message);
+      }
+    };
+    return;
+  }
+  if (loginResult.requires_totp_enrollment) {
+    card.innerHTML = `<h2>Configure o 2FA</h2><p>Copie a chave no seu aplicativo autenticador e informe o código gerado.</p><p><code id="totpSecret"></code></p><form id="confirmTotpForm"><input id="totpCode" inputmode="numeric" placeholder="Código de 6 dígitos" required><button type="submit">Confirmar 2FA</button></form>`;
+    api('/api/auth/totp/setup', { method: 'POST' })
+      .then((result) => {
+        document.querySelector('#totpSecret').textContent = result.secret;
+      })
+      .catch((error) => notify(error.message));
+    document.querySelector('#confirmTotpForm').onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api('/api/auth/totp/confirm', {
+          method: 'POST',
+          body: JSON.stringify({ code: document.querySelector('#totpCode').value })
+        });
+        await completeLogin();
+      } catch (error) {
+        notify(error.message);
+      }
+    };
+    return;
+  }
+  completeLogin();
+}
+
+async function completeLogin() {
+  currentUser = await api('/api/auth/me');
+  document.querySelector('#loginModal').classList.add('hidden');
+  document.querySelector('#actorBadge').textContent = `• ${currentUser.name}`;
+  updateNavigation();
+  dashboard();
+}
+
+document.querySelector('#loginForm').onsubmit = async (event) => {
+  event.preventDefault();
+  try {
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: document.querySelector('#loginEmail').value,
+        password: document.querySelector('#loginPassword').value,
+        totp_code: document.querySelector('#loginTotp').value || undefined
+      })
+    });
+    showOnboarding(result);
+  } catch (error) {
+    notify(error.message);
+  }
+};

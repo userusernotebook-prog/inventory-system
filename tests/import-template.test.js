@@ -6,6 +6,7 @@ const net = require('node:net');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const XLSX = require('xlsx');
+const argon2 = require('argon2');
 
 const projectDir = path.resolve(__dirname, '..');
 
@@ -45,11 +46,13 @@ function filledWorkbook({ code = 'F001', invalid = false, hireDate = false } = {
     B4: 'Notebook',
     F4: `SERIAL-${code}-3`,
     O4: 'Desativado',
-    P4: invalid ? '' : 'Sem reparo'
+    P4: invalid ? '' : 'Sem reparo',
+    Q1: 'LAUDO TÉCNICO',
+    Q4: invalid ? '' : 'Placa lógica sem reparo viável.'
   })) {
     assets[cell] = { t: 's', v: value };
   }
-  assets['!ref'] = 'A1:P4';
+  assets['!ref'] = 'A1:Q4';
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
@@ -104,7 +107,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
   const port = await freePort();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: testDir,
-    env: { ...process.env, PORT: String(port), ADMIN_PASSWORD: 'senha-de-teste' },
+    env: { ...process.env, PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   });
@@ -113,20 +116,22 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
   let serverErrors = '';
   child.stderr.on('data', (chunk) => (serverErrors += chunk));
 
-  async function api(route, method = 'GET', body, token, technicianId) {
+  let sessionCookie = '';
+  async function api(route, method = 'GET', body) {
     const response = await fetch(`http://127.0.0.1:${port}${route}`, {
       method,
       headers: {
         ...(body ? { 'content-type': 'application/json' } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-        ...(technicianId ? { 'x-technician-id': String(technicianId) } : {})
+        ...(sessionCookie ? { cookie: sessionCookie } : {})
       },
       body: body ? JSON.stringify(body) : undefined
     });
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) sessionCookie = setCookie.split(';')[0];
     return { status: response.status, data: await response.json() };
   }
 
-  async function upload(buffer, token, filename = 'teste.xlsx') {
+  async function upload(buffer, filename = 'teste.xlsx') {
     const form = new FormData();
     form.append(
       'file',
@@ -137,7 +142,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     );
     const response = await fetch(`http://127.0.0.1:${port}/api/import/excel`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
+      headers: { cookie: sessionCookie },
       body: form
     });
     return { status: response.status, data: await response.json() };
@@ -159,24 +164,52 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
       ready,
       `o servidor de teste deve iniciar (exit=${child.exitCode}): ${serverOutput} ${serverErrors}`
     );
-    const templateResponse = await fetch(`http://127.0.0.1:${port}/api/templates/initial`);
+    const control = new (require('better-sqlite3'))(path.join(testDir, 'data', 'inventory.db'));
+    try {
+      control
+        .prepare(
+          "INSERT INTO users(name,email,password_hash,profile_base,must_change_password) VALUES(?,?,?,'TECNICO',0)"
+        )
+        .run('Técnico', 'tecnico@example.test', await argon2.hash('SenhaDeTesteForte1'));
+      const userId = control
+        .prepare("SELECT id FROM users WHERE email='tecnico@example.test'")
+        .get().id;
+      const grant = control.prepare(
+        "INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?,?,'allow')"
+      );
+      for (const permission of ['employee:create', 'employee:update', 'audit:read']) {
+        grant.run(userId, permission);
+      }
+    } finally {
+      control.close();
+    }
+    const login = await api(
+      '/api/auth/login',
+      'POST',
+      {
+        email: 'tecnico@example.test',
+        password: 'SenhaDeTesteForte1'
+      },
+      undefined
+    );
+    assert.equal(login.status, 200, JSON.stringify(login.data));
+    assert.ok(sessionCookie);
+    const templateResponse = await fetch(`http://127.0.0.1:${port}/api/templates/initial`, {
+      headers: { cookie: sessionCookie }
+    });
     assert.equal(templateResponse.status, 200);
     assert.deepEqual(
       Buffer.from(await templateResponse.arrayBuffer()),
       fs.readFileSync(path.join(projectDir, 'public', 'modelo-importacao-inicial.xlsx'))
     );
-    const token = (await api('/api/admin/login', 'POST', { password: 'senha-de-teste' })).data
-      .token;
-    assert.ok(token);
-
-    const result = await upload(valid, token);
+    const result = await upload(valid);
     assert.equal(result.status, 200, JSON.stringify(result.data));
     assert.equal(result.data.employees, 1);
     assert.equal(result.data.assets, 3);
-    const importAudit = (await api('/api/admin/audit', 'GET', undefined, token)).data.find(
+    const importAudit = (await api('/api/admin/audit')).data.find(
       (entry) => entry.action === 'import'
     );
-    assert.deepEqual(JSON.parse(importAudit.details), {
+    assert.deepEqual(JSON.parse(importAudit.details).after, {
       employees: 1,
       assets: 3,
       skipped: 0,
@@ -197,7 +230,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
         hire_date: '2026-10-01',
         cost_center: 'TI-01'
       },
-      token
+      undefined
     );
     assert.equal(changed.status, 200, JSON.stringify(changed.data));
     const edited = (await api(`/api/employees/${people[0].id}`)).data;
@@ -205,32 +238,34 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     assert.equal(edited.cost_center, 'TI-01');
     assert.equal(edited.status, 'active');
     assert.equal(
-      (await api(`/api/employees/${people[0].id}`, 'PUT', { offboarded_at: '2026-10-02' }, token))
-        .status,
+      (await api(`/api/employees/${people[0].id}`, 'PUT', { offboarded_at: '2026-10-02' })).status,
       400
     );
     assert.equal(
-      (await api(`/api/employees/${people[0].id}`, 'PUT', { status: 'inactive' }, token)).status,
+      (await api(`/api/employees/${people[0].id}`, 'PUT', { status: 'inactive' })).status,
       400
     );
     assert.equal(
-      (await api(`/api/employees/${people[0].id}`, 'PUT', { hire_date: '2026-02-30' }, token))
-        .status,
+      (await api(`/api/employees/${people[0].id}`, 'PUT', { hire_date: '2026-02-30' })).status,
       400
     );
-    assert.deepEqual(assets.map((asset) => asset.status).sort(), ['assigned', 'backup', 'retired']);
-    const assigned = assets.find((asset) => asset.status === 'assigned');
+    assert.deepEqual(assets.map((asset) => asset.status).sort(), [
+      'BACKUP',
+      'DESATIVADO',
+      'EM_USO'
+    ]);
+    const assigned = assets.find((asset) => asset.status === 'EM_USO');
     assert.equal(assigned.employee_id, people[0].id);
     assert.equal(
       (await api(`/api/assets/${assigned.id}/history`)).data[0].movement_type,
-      'initial_import'
+      'IMPORTACAO_INICIAL'
     );
 
-    const assetReport = (await api('/api/dashboard/report?assetStatus=backup')).data;
+    const assetReport = (await api('/api/dashboard/report?assetStatus=BACKUP')).data;
     assert.equal(assetReport.summary.employeesActive, 1);
     assert.equal(assetReport.summary.assetsManaged, 2);
     assert.equal(assetReport.assets.total, 1);
-    assert.deepEqual(assetReport.assets.byStatus, [{ label: 'backup', n: 1 }]);
+    assert.deepEqual(assetReport.assets.byStatus, [{ label: 'BACKUP', n: 1 }]);
     assert.equal(assetReport.tickets.total, 0);
 
     const ticket = await api(
@@ -241,8 +276,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
         type: 'Suporte',
         description: 'Teste do painel'
       },
-      undefined,
-      1
+      undefined
     );
     assert.equal(ticket.status, 200, JSON.stringify(ticket.data));
     const ticketReport = (await api('/api/dashboard/report?ticketStatus=open&ticketType=Suporte'))
@@ -257,21 +291,21 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
       1
     );
 
-    assert.equal((await upload(valid, token)).status, 400);
-    const rejected = await upload(invalid, token);
+    assert.equal((await upload(valid)).status, 400);
+    const rejected = await upload(invalid);
     assert.equal(rejected.status, 400);
     assert.match(rejected.data.error, /MOTIVO/);
     assert.equal((await api('/api/employees')).data.length, 1);
     assert.equal((await api('/api/assets')).data.length, 3);
 
-    const dated = await upload(filledWorkbook({ code: 'F003', hireDate: true }), token);
+    const dated = await upload(filledWorkbook({ code: 'F003', hireDate: true }));
     assert.equal(dated.status, 200, JSON.stringify(dated.data));
     assert.equal(
       (await api('/api/employees')).data.find((person) => person.code === 'F003').hire_date,
       '2026-10-01'
     );
 
-    const legacy = await upload(legacyWorkbook(), token, 'legado.xlsm');
+    const legacy = await upload(legacyWorkbook(), 'legado.xlsm');
     assert.equal(legacy.status, 200, JSON.stringify(legacy.data));
     assert.equal(legacy.data.employees, 1);
     assert.equal(legacy.data.assets, 1);

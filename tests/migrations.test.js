@@ -27,6 +27,14 @@ function runMigration(testDir) {
   assert.equal(result.status, 0, result.stderr);
 }
 
+function runRollback(testDir) {
+  const result = spawnSync(process.execPath, ['scripts/rollback-migration.js', '005'], {
+    cwd: testDir,
+    encoding: 'utf8'
+  });
+  assert.equal(result.status, 0, result.stderr);
+}
+
 test('migrations preservam registros dos bancos antigo e atual e são idempotentes', () => {
   for (const version of ['legacy', 'current']) {
     const testDir = fs.mkdtempSync(path.join(projectDir, '.migration-test-'));
@@ -73,22 +81,25 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
         historical.close();
       }
       const copiedMigrations = path.join(testDir, 'src', 'db', 'migrations');
-      for (const file of fs.readdirSync(copiedMigrations)) {
+      for (const file of fs.readdirSync(copiedMigrations).filter((name) => name.endsWith('.sql'))) {
         const migrationPath = path.join(copiedMigrations, file);
         const sql = fs.readFileSync(migrationPath, 'utf8').replace(/\r\n/g, '\n');
         fs.writeFileSync(migrationPath, sql.replace(/\n/g, '\r\n'));
       }
       runMigration(testDir);
-      const migrated = new Database(dbPath, { readonly: true });
+      const migrated = new Database(dbPath);
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
-        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 4);
+        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 6);
         assert.equal(
           migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
           crypto.createHash('sha256').update(initSql.replace(/\r\n/g, '\n')).digest('hex')
         );
-        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM technicians').get().n, 1);
+        assert.equal(
+          migrated.prepare("SELECT COUNT(*) n FROM users WHERE profile_base='ADMIN'").get().n,
+          1
+        );
         assert.equal(
           migrated.prepare('SELECT name FROM employees WHERE id=11').get().name,
           'Pessoa preservada'
@@ -97,6 +108,20 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
           migrated.prepare('SELECT serial FROM assets WHERE id=13').get().serial,
           'SER-13'
         );
+        assert.equal(
+          migrated.prepare('SELECT status FROM assets WHERE id=13').get().status,
+          'EM_USO'
+        );
+        const movement = migrated
+          .prepare(
+            'SELECT from_status,to_status,movement_type,responsible_user_id,occurred_at FROM movements'
+          )
+          .get();
+        assert.equal(movement.from_status, 'DISPONIVEL');
+        assert.equal(movement.to_status, 'EM_USO');
+        assert.equal(movement.movement_type, 'ATRIBUICAO');
+        assert.equal(movement.responsible_user_id, null);
+        assert.match(movement.occurred_at, /Z$/);
         for (const table of ['assignments', 'movements', 'tickets', 'audit_log']) {
           assert.equal(migrated.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n, 1);
         }
@@ -104,6 +129,10 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
         for (const name of ['offboarded_at', 'cost_center', 'hire_date']) {
           assert.ok(columns.includes(name));
         }
+        assert.throws(
+          () => migrated.prepare('DELETE FROM movements WHERE id=1').run(),
+          /imutáveis/
+        );
       } finally {
         migrated.close();
       }
@@ -111,5 +140,75 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       assert.equal(path.dirname(path.resolve(testDir)), projectDir);
       fs.rmSync(testDir, { recursive: true, force: true });
     }
+  }
+});
+
+test('a migration do estado do ativo pode ser revertida e aplicada novamente', () => {
+  const testDir = fs.mkdtempSync(path.join(projectDir, '.migration-test-'));
+  try {
+    fs.mkdirSync(path.join(testDir, 'data'));
+    fs.mkdirSync(path.join(testDir, 'scripts'));
+    fs.copyFileSync(path.join(projectDir, 'db.js'), path.join(testDir, 'db.js'));
+    fs.copyFileSync(
+      path.join(projectDir, 'scripts', 'rollback-migration.js'),
+      path.join(testDir, 'scripts', 'rollback-migration.js')
+    );
+    fs.cpSync(path.join(projectDir, 'src'), path.join(testDir, 'src'), { recursive: true });
+    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '006_users_and_permissions.sql'));
+    const dbPath = path.join(testDir, 'data', 'inventory.db');
+    const db = new Database(dbPath);
+    try {
+      db.exec(initSql);
+      db.prepare(
+        "INSERT INTO assets(id,equipment_type,serial,status) VALUES(1,'Notebook','SER-ROLLBACK','backup')"
+      ).run();
+    } finally {
+      db.close();
+    }
+
+    runMigration(testDir);
+    const migrated = new Database(dbPath);
+    try {
+      migrated.prepare("UPDATE assets SET status='EM_AVALIACAO' WHERE id=1").run();
+    } finally {
+      migrated.close();
+    }
+
+    runRollback(testDir);
+    const rolledBack = new Database(dbPath);
+    try {
+      assert.equal(
+        rolledBack.prepare('SELECT status FROM assets WHERE id=1').get().status,
+        'backup'
+      );
+      assert.equal(
+        rolledBack.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,
+        4
+      );
+    } finally {
+      rolledBack.close();
+    }
+
+    runMigration(testDir);
+    const reapplied = new Database(dbPath);
+    try {
+      assert.equal(
+        reapplied.prepare('SELECT status FROM assets WHERE id=1').get().status,
+        'EM_AVALIACAO'
+      );
+      assert.equal(
+        reapplied
+          .prepare(
+            "SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name='movements_prevent_delete'"
+          )
+          .get().n,
+        1
+      );
+    } finally {
+      reapplied.close();
+    }
+  } finally {
+    assert.equal(path.dirname(path.resolve(testDir)), projectDir);
+    fs.rmSync(testDir, { recursive: true, force: true });
   }
 });
