@@ -8,7 +8,7 @@ const legacyColumns = new Map([
   [3, 'cost_center'],
   [4, 'hire_date']
 ]);
-const structuralMigrations = new Set([5, 6]);
+const structuralMigrations = new Set([5, 6, 8]);
 
 function applyStructuralMigration(db, sql, record) {
   db.pragma('foreign_keys = OFF');

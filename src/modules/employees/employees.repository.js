@@ -14,7 +14,7 @@ function createEmployeesRepository(db) {
       return db.prepare('SELECT * FROM employees WHERE id=?').get(id);
     },
     findActiveById(id) {
-      return db.prepare("SELECT * FROM employees WHERE id=? AND status='active'").get(id);
+      return db.prepare("SELECT * FROM employees WHERE id=? AND status='ativo'").get(id);
     },
     findCodeDuplicate(code, id) {
       return db
@@ -50,12 +50,6 @@ function createEmployeesRepository(db) {
           hire_date=@hire_date,offboarded_at=@offboarded_at,
           updated_at=CURRENT_TIMESTAMP WHERE id=@id`
       ).run({ ...input, id });
-    },
-    markInactive(id) {
-      db.prepare(
-        `UPDATE employees SET status='inactive',offboarded_at=CURRENT_TIMESTAMP,
-          updated_at=CURRENT_TIMESTAMP WHERE id=?`
-      ).run(id);
     }
   };
 }

@@ -13,13 +13,6 @@ function createAssignmentsRoutes(service, authService) {
     validate(schema.params, 'params'),
     controller.listEmployeeAssets
   );
-  router.post(
-    '/api/employees/:id/offboard',
-    ...requirePermission(authService, 'employee:offboard'),
-    validate(schema.params, 'params'),
-    validate(schema.offboard, 'body'),
-    controller.offboard
-  );
   return router;
 }
 

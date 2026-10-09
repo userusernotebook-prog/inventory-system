@@ -87,7 +87,7 @@ function createImportsRepository(db) {
     },
     insertLegacyEmployee(code, name, city, department) {
       return db
-        .prepare("INSERT INTO employees(code,name,city,department,status) VALUES(?,?,?,?,'active')")
+        .prepare("INSERT INTO employees(code,name,city,department,status) VALUES(?,?,?,?,'ativo')")
         .run(code, name, city, department).lastInsertRowid;
     },
     legacyAssetExists(serial, hostname) {

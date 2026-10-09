@@ -71,7 +71,9 @@ function createMovementsService(
       authService.assertScope(user, employee);
     }
 
-    if (openAssignment) assignmentsRepository.close(openAssignment.id);
+    if (openAssignment && toStatus !== ASSET_STATES.RETURN_PENDING) {
+      assignmentsRepository.close(openAssignment.id);
+    }
     if (toStatus === ASSET_STATES.IN_USE) {
       assignmentsRepository.create(assetId, employeeToId, user.id);
     }

@@ -91,10 +91,15 @@ function createApprovalsService(
     }
   }
 
-  function assertEmployee(employeeId, user) {
+  function assertEmployee(employeeId, user, allowOffboarding = false) {
     if (!employeeId) return;
-    const employee = employeesRepository.findActiveById(employeeId);
-    if (!employee) throw new ValidationError('Funcionário ativo não encontrado.');
+    const employee = employeesRepository.findById(employeeId);
+    if (
+      !employee ||
+      (employee.status !== 'ativo' && !(allowOffboarding && employee.status === 'em_desligamento'))
+    ) {
+      throw new ValidationError('Funcionário ativo não encontrado.');
+    }
     authService.assertScope(user, employee);
   }
 
@@ -163,7 +168,7 @@ function createApprovalsService(
     create(input, user) {
       authService.authorize(user, 'request:create');
       const items = requestAssets(input, user);
-      assertEmployee(input.employee_id, user);
+      assertEmployee(input.employee_id, user, input.type === TYPES.DEACTIVATION);
       return db.transaction(() => {
         expireDueRequests();
         assertAssetsAvailable(items, user);

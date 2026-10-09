@@ -133,7 +133,7 @@ function importTemplate(repository, workbook, responsibleUserId) {
         `Funcionarios, linha ${row.line}: funcionário ativo não pode ter DATA DE DESLIGAMENTO.`
       );
     }
-    const status = statusText === 'ATIVO' ? 'active' : 'inactive';
+    const status = statusText === 'ATIVO' ? 'ativo' : 'desligado';
     const id = repository.insertTemplateEmployee({
       code,
       name,
@@ -214,7 +214,7 @@ function importTemplate(repository, workbook, responsibleUserId) {
         }
         employee = matches[0];
       }
-      if (employee.status !== 'active') {
+      if (employee.status !== 'ativo') {
         throw new ValidationError(
           `Ativos, linha ${row.line}: funcionário desligado não pode receber equipamento.`
         );

@@ -236,7 +236,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
     const edited = (await api(`/api/employees/${people[0].id}`)).data;
     assert.equal(edited.hire_date, '2026-10-01');
     assert.equal(edited.cost_center, 'TI-01');
-    assert.equal(edited.status, 'active');
+    assert.equal(edited.status, 'ativo');
     assert.equal(
       (await api(`/api/employees/${people[0].id}`, 'PUT', { offboarded_at: '2026-10-02' })).status,
       400

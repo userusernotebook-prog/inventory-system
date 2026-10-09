@@ -29,7 +29,7 @@ function setup() {
     )
     .run('Técnico', 'tech@test.local', 'not-used').lastInsertRowid;
   const employeeId = db
-    .prepare("INSERT INTO employees(name,status) VALUES('Pessoa','active')")
+    .prepare("INSERT INTO employees(name,status) VALUES('Pessoa','ativo')")
     .run().lastInsertRowid;
   const authRepository = createAuthRepository(db);
   const audit = { logUser() {} };

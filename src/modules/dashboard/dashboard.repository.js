@@ -1,7 +1,7 @@
 function createDashboardRepository(db) {
   function summary() {
     const counts = {
-      employees: db.prepare("SELECT COUNT(*) c FROM employees WHERE status='active'").get().c,
+      employees: db.prepare("SELECT COUNT(*) c FROM employees WHERE status='ativo'").get().c,
       assigned: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='EM_USO'").get().c,
       backup: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='BACKUP'").get().c,
       maintenance: db.prepare("SELECT COUNT(*) c FROM assets WHERE status='EM_MANUTENCAO'").get().c,
@@ -66,7 +66,7 @@ function createDashboardRepository(db) {
     const assetWhere = assetConditions.join(' AND ');
 
     const summary = {
-      employeesActive: db.prepare("SELECT COUNT(*) n FROM employees WHERE status='active'").get().n,
+      employeesActive: db.prepare("SELECT COUNT(*) n FROM employees WHERE status='ativo'").get().n,
       assetsManaged: db.prepare("SELECT COUNT(*) n FROM assets WHERE status<>'DESATIVADO'").get().n,
       techniciansActive: db
         .prepare("SELECT COUNT(*) n FROM users WHERE active=1 AND profile_base='TECNICO'")

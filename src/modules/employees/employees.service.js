@@ -25,7 +25,7 @@ function createEmployeesService(db, repository, auditService, authService) {
           location: text(body.location),
           corporate_phone: text(body.corporate_phone),
           personal_phone: text(body.personal_phone),
-          status: body.status === 'inactive' ? 'inactive' : 'active'
+          status: body.status === 'desligado' ? 'desligado' : 'ativo'
         });
         auditService.logUser(technician, 'create', 'employee', id, {
           after: { name: text(body.name), city: text(body.city), department: text(body.department) }
@@ -64,7 +64,7 @@ function createEmployeesService(db, repository, auditService, authService) {
       updated.offboarded_at = Object.hasOwn(body, 'offboarded_at')
         ? optionalDate(body.offboarded_at, 'Data de desligamento')
         : current.offboarded_at;
-      if (current.status === 'active' && updated.offboarded_at) {
+      if (current.status !== 'desligado' && updated.offboarded_at) {
         throw new ValidationError(
           'A data de desligamento só pode ser preenchida após o desligamento.'
         );
