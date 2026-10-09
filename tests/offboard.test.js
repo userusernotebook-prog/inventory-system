@@ -32,6 +32,7 @@ test('desligamento valida todos os destinos e grava tudo em uma transação', as
     path.join(projectDir, 'workbook-reader.js'),
     path.join(testDir, 'workbook-reader.js')
   );
+  fs.cpSync(path.join(projectDir, 'src'), path.join(testDir, 'src'), { recursive: true });
   const port = await freePort();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: testDir,

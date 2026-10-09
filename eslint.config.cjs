@@ -18,11 +18,12 @@ module.exports = [
       'vendor/**',
       '.artifact-template/**',
       '.import-test-*/**',
-      '.offboard-test-*/**'
+      '.offboard-test-*/**',
+      '.migration-test-*/**'
     ]
   },
   {
-    files: ['*.js', '*.cjs', 'scripts/**/*.js', 'tests/**/*.js'],
+    files: ['*.js', '*.cjs', 'src/**/*.js', 'scripts/**/*.js', 'tests/**/*.js'],
     languageOptions: { globals: globals.node, sourceType: 'commonjs' },
     rules: eslint.configs.recommended.rules
   },

@@ -5,6 +5,7 @@
 !/.env.example
 /.import-test-*/
 /.offboard-test-*/
+/.migration-test-*/
 /.artifact-template/
 /public/*.ndjson
 /public/~$*

@@ -9,15 +9,16 @@
     "backup": "node scripts/backup.js",
     "test": "node --test",
     "lint": "eslint .",
-    "format": "prettier --write \"*.{js,cjs}\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json",
-    "format:check": "prettier --check \"*.{js,cjs}\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json"
+    "format": "prettier --write \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json",
+    "format:check": "prettier --check \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"public/*.{js,css,html}\" \"*.{json,md}\" .prettierrc.json"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
     "dotenv": "18.0.6",
     "express": "^5.1.0",
     "multer": "^2.0.0",
-    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

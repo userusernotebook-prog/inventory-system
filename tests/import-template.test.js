@@ -95,6 +95,7 @@ test('o modelo importa vínculos e histórico; um erro desfaz toda a planilha', 
   ]) {
     fs.copyFileSync(path.join(projectDir, file), path.join(testDir, file));
   }
+  fs.cpSync(path.join(projectDir, 'src'), path.join(testDir, 'src'), { recursive: true });
   fs.mkdirSync(path.join(testDir, 'public'));
   fs.copyFileSync(
     path.join(projectDir, 'public', 'modelo-importacao-inicial.xlsx'),
