@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const argon2 = require('argon2');
 const { generate } = require('otplib');
+
+process.env.TOTP_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
 const { migrate } = require('../../../src/db/migrate');
 const { createAuthRepository } = require('../../../src/modules/auth/auth.repository');
 const { createAuthService } = require('../../../src/modules/auth/auth.service');

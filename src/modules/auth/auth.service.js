@@ -3,6 +3,7 @@ const argon2 = require('argon2');
 const { generateSecret, generateURI, verify } = require('otplib');
 const { ForbiddenError, UnauthorizedError, ValidationError } = require('../../shared/errors');
 const { pageResult } = require('../../shared/utils/query');
+const { decryptTotpSecret, encryptTotpSecret } = require('./totp-crypto');
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -72,7 +73,13 @@ function createAuthService(repository, auditService) {
       );
       throw new UnauthorizedError('E-mail ou senha inválidos.');
     }
-    if (user.totp_enabled && !(await hasValidTotp(String(input.totp_code || ''), user.totp_secret)))
+    if (
+      user.totp_enabled &&
+      !(await hasValidTotp(
+        String(input.totp_code || ''),
+        decryptTotpSecret(user.totp_secret, process.env.TOTP_ENCRYPTION_KEY)
+      ))
+    )
       throw new UnauthorizedError('Código de autenticação inválido.');
     repository.updateLogin(user.id);
     const token = crypto.randomBytes(32).toString('base64url');
@@ -169,12 +176,17 @@ function createAuthService(repository, auditService) {
     },
     setupTotp(user) {
       const secret = generateSecret();
-      repository.setTotp(user.id, secret, false);
+      repository.setTotp(user.id, encryptTotpSecret(secret, process.env.TOTP_ENCRYPTION_KEY), false);
       return { secret, uri: generateURI({ issuer: 'Inventário TI', label: user.email, secret }) };
     },
     async confirmTotp(user, code) {
       const fresh = repository.findById(user.id);
-      if (!(await hasValidTotp(code, fresh.totp_secret)))
+      if (
+        !(await hasValidTotp(
+          code,
+          decryptTotpSecret(fresh.totp_secret, process.env.TOTP_ENCRYPTION_KEY)
+        ))
+      )
         throw new ValidationError('Código TOTP inválido.');
       repository.setTotp(user.id, fresh.totp_secret, true);
       return { ok: true };

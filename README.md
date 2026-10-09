@@ -32,6 +32,7 @@ npm run web:dev
 | `PORT`                        | Porta HTTP da aplicacao                         | `3000`                  |
 | `NODE_ENV`                    | `development`, `test` ou `production`           | `development`           |
 | `APP_ORIGIN`                  | Origem HTTPS publica aceita para cookies e CORS | obrigatoria em producao |
+| `TOTP_ENCRYPTION_KEY`          | Chave AES-256-GCM em base64 para segredos TOTP  | obrigatoria             |
 | `EMPLOYEE_ANONYMIZATION_DAYS` | Dias ate anonimizar funcionarios desligados     | `1825`                  |
 | `DATABASE_PATH`               | Caminho do SQLite para o backup                 | `data/inventory.db`     |
 | `BACKUP_DIR`                  | Diretorio local dos backups                     | `data/backups`          |
@@ -44,6 +45,8 @@ npm run web:dev
 `APP_ORIGIN` deve ser a URL final, por exemplo `https://inventario.empresa.com`. Nunca versione `.env`, certificados ou `data/`.
 
 `ADMIN_PASSWORD` e `ADMIN_PASSWORD_FILE` sao usados somente por `create-admin` e `reset-admin`; eles nao devem permanecer em `.env`. Prefira um segredo temporario injetado pelo ambiente ou um arquivo de secret com permissao restrita.
+
+`TOTP_ENCRYPTION_KEY` deve conter 32 bytes aleatorios codificados em base64. Guarde-a em um cofre de segredos ou Docker secret separado dos backups; nunca no banco, no repositório ou na mesma montagem externa de backup. A aplicacao nao inicia sem a chave. Para rotaciona-la, execute uma migracao controlada que decifre cada segredo com a chave antiga e o cifre com a nova, altere a chave no cofre e reinicie todos os processos. Se a chave for perdida, use `npm run reset-admin` para reiniciar o 2FA do administrador e recadastre os demais usuarios.
 
 ## Arquitetura
 

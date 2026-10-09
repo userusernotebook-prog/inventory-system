@@ -1,6 +1,6 @@
 const { createApp } = require('./app');
-const db = require('./db/connection');
 const { port } = require('./config/env');
+const db = require('./db/connection');
 const app = createApp(db);
 
 app.listen(port, () => {
