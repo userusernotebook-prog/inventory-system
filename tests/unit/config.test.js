@@ -18,4 +18,11 @@ test('a inicialização valida a porta e não depende de senha em variável de a
   assert.match(invalidPort.stderr, /PORT/);
 
   assert.equal(startWith({ PORT: '3000' }).status, 0);
+  const productionWithoutOrigin = startWith({ NODE_ENV: 'production', APP_ORIGIN: '' });
+  assert.notEqual(productionWithoutOrigin.status, 0);
+  assert.match(productionWithoutOrigin.stderr, /APP_ORIGIN/);
+  assert.equal(
+    startWith({ NODE_ENV: 'production', APP_ORIGIN: 'https://inventario.example.test' }).status,
+    0
+  );
 });
