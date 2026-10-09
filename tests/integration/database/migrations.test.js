@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const Database = require('better-sqlite3');
@@ -22,6 +23,7 @@ function makeLegacySchema(sql) {
 function runMigration(testDir) {
   const result = spawnSync(process.execPath, ['-e', "require('./db')"], {
     cwd: testDir,
+    env: { ...process.env, NODE_PATH: path.join(projectDir, 'node_modules') },
     encoding: 'utf8'
   });
   assert.equal(result.status, 0, result.stderr);
@@ -30,6 +32,7 @@ function runMigration(testDir) {
 function runRollback(testDir) {
   const result = spawnSync(process.execPath, ['scripts/rollback-migration.js', '005'], {
     cwd: testDir,
+    env: { ...process.env, NODE_PATH: path.join(projectDir, 'node_modules') },
     encoding: 'utf8'
   });
   assert.equal(result.status, 0, result.stderr);
@@ -37,7 +40,7 @@ function runRollback(testDir) {
 
 test('migrations preservam registros dos bancos antigo e atual e são idempotentes', () => {
   for (const version of ['legacy', 'current']) {
-    const testDir = fs.mkdtempSync(path.join(projectDir, '.migration-test-'));
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-migration-test-'));
     try {
       fs.mkdirSync(path.join(testDir, 'data'));
       fs.copyFileSync(path.join(projectDir, 'db.js'), path.join(testDir, 'db.js'));
@@ -91,7 +94,7 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
-        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 9);
+        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 10);
         assert.equal(
           migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
           crypto.createHash('sha256').update(initSql.replace(/\r\n/g, '\n')).digest('hex')
@@ -137,14 +140,14 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
         migrated.close();
       }
     } finally {
-      assert.equal(path.dirname(path.resolve(testDir)), projectDir);
+      assert.equal(path.dirname(path.resolve(testDir)), path.resolve(os.tmpdir()));
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   }
 });
 
 test('a migration do estado do ativo pode ser revertida e aplicada novamente', () => {
-  const testDir = fs.mkdtempSync(path.join(projectDir, '.migration-test-'));
+  const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-migration-test-'));
   try {
     fs.mkdirSync(path.join(testDir, 'data'));
     fs.mkdirSync(path.join(testDir, 'scripts'));
@@ -157,6 +160,8 @@ test('a migration do estado do ativo pode ser revertida e aplicada novamente', (
     fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '006_users_and_permissions.sql'));
     fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '007_approval_requests.sql'));
     fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '008_offboarding_governance.sql'));
+    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '009_utc_timestamps_and_employee_code.sql'));
+    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '010_audit_log_immutable.sql'));
     const dbPath = path.join(testDir, 'data', 'inventory.db');
     const db = new Database(dbPath);
     try {
@@ -210,7 +215,7 @@ test('a migration do estado do ativo pode ser revertida e aplicada novamente', (
       reapplied.close();
     }
   } finally {
-    assert.equal(path.dirname(path.resolve(testDir)), projectDir);
+    assert.equal(path.dirname(path.resolve(testDir)), path.resolve(os.tmpdir()));
     fs.rmSync(testDir, { recursive: true, force: true });
   }
 });
