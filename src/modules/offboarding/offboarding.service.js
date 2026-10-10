@@ -192,6 +192,7 @@ function createOffboardingService(
           (counts[ASSET_STATES.DEACTIVATED] || 0),
         open_tickets: repository.openTickets(employee.id).length,
         pending_deactivations: repository.pendingDeactivation(employee.id),
+        assets: repository.checklistAssets(employee.id),
         events: repository.events(employee.id)
       };
     }

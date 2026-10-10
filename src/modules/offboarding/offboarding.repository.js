@@ -55,6 +55,17 @@ function createOffboardingRepository(db) {
         .all(employeeId, employeeId);
       return Object.fromEntries(counts.map((row) => [row.status, row.count]));
     },
+    checklistAssets(employeeId) {
+      return db
+        .prepare(
+          `SELECT DISTINCT a.id,a.hostname,a.serial,a.equipment_type,a.status
+          FROM assets a
+          LEFT JOIN assignments ass ON ass.asset_id=a.id AND ass.returned_at IS NULL
+          WHERE ass.employee_id=? OR a.id IN (SELECT asset_id FROM asset_receipts WHERE employee_id=?)
+          ORDER BY a.id`
+        )
+        .all(employeeId, employeeId);
+    },
     openTickets(employeeId) {
       return db
         .prepare("SELECT * FROM tickets WHERE employee_id=? AND status IN ('open','in_progress')")

@@ -79,6 +79,19 @@ async function seed(db) {
   db.prepare(
     "INSERT INTO assets(equipment_type, serial, hostname, status) VALUES('Notebook', 'E2E-BACKUP-APPROVAL', 'backup-approval-e2e', 'BACKUP')"
   ).run();
+  const uiOffboardingEmployeeId = db
+    .prepare(
+      "INSERT INTO employees(name, email, status) VALUES('Pessoa Desligamento Interface E2E', 'desligamento-ui.e2e@example.test', 'ativo')"
+    )
+    .run().lastInsertRowid;
+  const uiOffboardingAssetId = db
+    .prepare(
+      "INSERT INTO assets(equipment_type, serial, hostname, status) VALUES('Notebook', 'E2E-OFFBOARD-UI', 'offboard-ui-e2e', 'EM_USO')"
+    )
+    .run().lastInsertRowid;
+  db.prepare(
+    'INSERT INTO assignments(asset_id, employee_id, responsible_user_id) VALUES(?, ?, ?)'
+  ).run(uiOffboardingAssetId, uiOffboardingEmployeeId, technicianId);
 }
 
 async function main() {
