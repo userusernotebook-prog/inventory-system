@@ -1,4 +1,5 @@
 const { likeContains } = require('../../shared/utils/query');
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
 
 const SORT_COLUMNS = {
   hostname: 'a.hostname',
@@ -8,17 +9,36 @@ const SORT_COLUMNS = {
   status: 'a.status',
   updated_at: 'a.updated_at'
 };
+// Alcance do ativo: cidade e tipo do próprio ativo; departamento de quem está com ele.
+const ASSET_SCOPE = {
+  city: 'a.city',
+  equipment_type: 'a.equipment_type',
+  department: 'e.department'
+};
+// Quem está com o ativo só é exibido se também estiver no alcance.
+const HOLDER_SCOPE = { city: 'e.city', department: 'e.department' };
+const JOINS = ` FROM assets a
+  LEFT JOIN assignments s ON s.asset_id=a.id AND s.returned_at IS NULL
+  LEFT JOIN employees e ON e.id=s.employee_id`;
 
 function createAssetsRepository(db) {
+  registerScopeFunction(db);
   return {
-    list(options, scopes = []) {
-      const where = ['1=1'];
+    list(options, scopes = [], { holderSearch = true } = {}) {
+      const where = [];
       const params = [];
+      const holder = scopeCondition(scopes, HOLDER_SCOPE);
       if (options.q) {
-        where.push(
-          "(a.serial LIKE ? ESCAPE '\\' OR a.hostname LIKE ? ESCAPE '\\' OR a.model LIKE ? ESCAPE '\\' OR a.reference LIKE ? ESCAPE '\\' OR e.name LIKE ? ESCAPE '\\')"
-        );
-        params.push(...Array(5).fill(likeContains(options.q)));
+        const like = likeContains(options.q);
+        let search =
+          "a.serial LIKE ? ESCAPE '\\' OR a.hostname LIKE ? ESCAPE '\\' OR a.model LIKE ? ESCAPE '\\' OR a.reference LIKE ? ESCAPE '\\'";
+        const searchParams = Array(4).fill(like);
+        if (holderSearch) {
+          search += ` OR (e.name LIKE ? ESCAPE '\\' AND ${holder.sql})`;
+          searchParams.push(like, ...holder.params);
+        }
+        where.push(`(${search})`);
+        params.push(...searchParams);
       }
       for (const field of ['status', 'city', 'equipment_type']) {
         if (options[field]) {
@@ -26,49 +46,34 @@ function createAssetsRepository(db) {
           params.push(options[field]);
         }
       }
-      for (const scopeType of ['city', 'equipment_type']) {
-        const values = scopes
-          .filter((scope) => scope.scope_type === scopeType)
-          .map((scope) => scope.scope_value);
-        if (values.length) {
-          where.push(`lower(a.${scopeType}) IN (${values.map(() => 'lower(?)').join(',')})`);
-          params.push(...values);
-        }
-      }
-      const departments = scopes
-        .filter((scope) => scope.scope_type === 'department')
-        .map((scope) => scope.scope_value);
-      if (departments.length) {
-        where.push(
-          `lower(COALESCE(e.department,'')) IN (${departments.map(() => 'lower(?)').join(',')})`
-        );
-        params.push(...departments);
-      }
-      const joins = ` FROM assets a
-        LEFT JOIN assignments s ON s.asset_id=a.id AND s.returned_at IS NULL
-        LEFT JOIN employees e ON e.id=s.employee_id`;
+      const scope = scopeCondition(scopes, ASSET_SCOPE);
+      where.push(scope.sql);
+      params.push(...scope.params);
       const clause = ` WHERE ${where.join(' AND ')}`;
       const sort = SORT_COLUMNS[options.sortBy] || 'a.updated_at';
       const direction = options.sortOrder === 'asc' ? 'ASC' : 'DESC';
       const total = db
-        .prepare(`SELECT count(DISTINCT a.id) count${joins}${clause}`)
+        .prepare(`SELECT count(DISTINCT a.id) count${JOINS}${clause}`)
         .get(...params).count;
       const items = db
         .prepare(
-          `SELECT a.*,e.id employee_id,e.name employee_name,e.department employee_department${joins}${clause}
+          `SELECT a.*,e.id employee_id,e.name employee_name,e.department employee_department,
+          (${holder.sql}) holder_in_scope${JOINS}${clause}
           ORDER BY ${sort} ${direction},a.id DESC LIMIT ? OFFSET ?`
         )
-        .all(...params, options.pageSize, (options.page - 1) * options.pageSize);
+        .all(...holder.params, ...params, options.pageSize, (options.page - 1) * options.pageSize);
       return { items, total };
     },
-    findById(id) {
+    // Sem alcance (undefined), devolve o ativo sem filtro: uso interno de regras.
+    findById(id, scopes) {
+      const holder = scopeCondition(scopes || [], HOLDER_SCOPE);
+      const scope = scopeCondition(scopes || [], ASSET_SCOPE);
       return db
         .prepare(
-          `SELECT a.*,e.department employee_department FROM assets a
-          LEFT JOIN assignments s ON s.asset_id=a.id AND s.returned_at IS NULL
-          LEFT JOIN employees e ON e.id=s.employee_id WHERE a.id=?`
+          `SELECT a.*,e.id employee_id,e.name employee_name,e.department employee_department,
+          (${holder.sql}) holder_in_scope${JOINS} WHERE a.id=? AND ${scope.sql}`
         )
-        .get(id);
+        .get(...holder.params, id, ...scope.params);
     },
     create(input) {
       const now = new Date().toISOString();

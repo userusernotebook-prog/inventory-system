@@ -1,4 +1,4 @@
-const { ConflictError, ValidationError } = require('../../shared/errors');
+const { ConflictError, ForbiddenError, ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const {
   ASSET_STATES,
@@ -118,10 +118,19 @@ function createMovementsService(
     performMove,
     normalizeState,
     listAssetHistory(assetId, user) {
-      const asset = assetsRepository.findById(assetId);
-      if (!asset) throw new ValidationError('Equipamento não encontrado.');
-      authService.assertScope(user, asset);
-      return movementsRepository.listAssetHistory(assetId);
+      const scopes = authService.scopes(user);
+      if (!assetsRepository.findById(assetId, scopes)) {
+        if (scopes.length && assetsRepository.findById(assetId)) {
+          throw new ForbiddenError('Seu alcance não permite acessar este registro.');
+        }
+        throw new ValidationError('Equipamento não encontrado.');
+      }
+      const showEmployees = authService.can(user, 'employee:read');
+      return movementsRepository
+        .listAssetHistory(assetId, scopes)
+        .map((movement) =>
+          showEmployees ? movement : { ...movement, employee_from: null, employee_to: null }
+        );
     },
     move(assetId, body, technician) {
       const rule = db.transaction(() => {

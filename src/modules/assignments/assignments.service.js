@@ -1,4 +1,4 @@
-const { ValidationError } = require('../../shared/errors');
+const { ForbiddenError, ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
 
@@ -12,10 +12,21 @@ function createAssignmentsService(
 ) {
   return {
     listEmployeeAssets(employeeId, user) {
-      const employee = employeesRepository.findById(employeeId);
-      if (!employee) throw new ValidationError('Funcionário não encontrado.');
-      authService.assertScope(user, employee);
-      return authService.filterByScope(user, repository.listEmployeeAssets(employeeId));
+      const scopes = authService.scopes(user);
+      if (!employeesRepository.findById(employeeId, scopes)) {
+        if (scopes.length && employeesRepository.findById(employeeId)) {
+          throw new ForbiddenError('Seu alcance não permite acessar este registro.');
+        }
+        throw new ValidationError('Funcionário não encontrado.');
+      }
+      const showValue =
+        typeof authService.can === 'function' && authService.can(user, 'asset:view_value');
+      return repository.listEmployeeAssets(employeeId, scopes).map((asset) => {
+        if (showValue) return asset;
+        const visible = { ...asset };
+        delete visible.acquisition_value;
+        return visible;
+      });
     },
     offboard(employeeId, decisions, technician) {
       return db.transaction(() => {

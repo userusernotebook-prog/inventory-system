@@ -251,7 +251,7 @@ function createApprovalsService(
       if (!detail) throw new NotFoundError('Solicitação não encontrada.');
       if (detail.requester_user_id !== user.id && user.profile_base !== 'ADMIN')
         throw new ForbiddenError();
-      return detail;
+      return authService.can(user, 'employee:read') ? detail : { ...detail, employee_name: null };
     },
     approve(id, approver, reason) {
       assertAdmin(approver);

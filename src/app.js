@@ -90,7 +90,7 @@ function createApp(db) {
     authService
   );
   const importsService = createImportsService(db, createImportsRepository(db), auditService);
-  const dashboardService = createDashboardService(createDashboardRepository(db));
+  const dashboardService = createDashboardService(createDashboardRepository(db), authService);
   const approvalsService = createApprovalsService(
     db,
     createApprovalsRepository(db),

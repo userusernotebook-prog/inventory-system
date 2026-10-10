@@ -140,15 +140,19 @@ test('servicos de atribuicoes, chamados, painel e auditoria aplicam suas regras'
   assert.equal(tickets.list({ page: 1, pageSize: 25 }, user).total, 0);
   assert.equal(tickets.create({ employee_id: 1, description: 'Teste' }, user).id, 5);
 
-  const dashboard = createDashboardService({
-    summary: () => ({ assets: 1 }),
-    report: (filters) => filters
-  });
-  assert.equal(dashboard.summary().assets, 1);
-  assert.equal(dashboard.report({ year: '2026', month: '10' }).year, '2026');
-  assert.throws(() => dashboard.report({ year: '20' }), /Ano/);
-  assert.throws(() => dashboard.report({ month: '13' }), /M.s/);
-  assert.throws(() => dashboard.report({ assetStatus: 'INVALIDO' }), /ativo/);
+  const dashboard = createDashboardService(
+    {
+      summary: (scopes, visibility) => ({ assets: 1, scopes, visibility }),
+      report: (filters) => filters
+    },
+    { scopes: () => [], can: (_user, permission) => permission === 'employee:read' }
+  );
+  assert.equal(dashboard.summary(user).assets, 1);
+  assert.deepEqual(dashboard.summary(user).visibility, { employees: true, tickets: false });
+  assert.equal(dashboard.report({ year: '2026', month: '10' }, user).year, '2026');
+  assert.throws(() => dashboard.report({ year: '20' }, user), /Ano/);
+  assert.throws(() => dashboard.report({ month: '13' }, user), /M.s/);
+  assert.throws(() => dashboard.report({ assetStatus: 'INVALIDO' }, user), /ativo/);
 
   const auditCalls = [];
   const audit = createAuditService({

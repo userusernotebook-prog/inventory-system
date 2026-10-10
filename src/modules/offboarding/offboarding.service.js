@@ -188,7 +188,7 @@ function createOffboardingService(
       return {
         employee: {
           id: employee.id,
-          name: employee.name,
+          name: authService.can(user, 'employee:read') ? employee.name : null,
           status: employee.status,
           offboarding_date: employee.offboarded_at
         },
@@ -200,7 +200,7 @@ function createOffboardingService(
           (counts[ASSET_STATES.DEACTIVATED] || 0),
         open_tickets: repository.openTickets(employee.id).length,
         pending_deactivations: repository.pendingDeactivation(employee.id),
-        assets: repository.checklistAssets(employee.id),
+        assets: repository.checklistAssets(employee.id, authService.scopes(user)),
         events: repository.events(employee.id)
       };
     }

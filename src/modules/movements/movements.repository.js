@@ -1,4 +1,7 @@
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
+
 function createMovementsRepository(db) {
+  registerScopeFunction(db);
   return {
     create(input) {
       return db
@@ -32,18 +35,22 @@ function createMovementsRepository(db) {
         )
         .get(assetId, new Date().toISOString());
     },
-    listAssetHistory(assetId) {
+    // Nomes de quem entregou/recebeu só vêm quando a pessoa está no alcance.
+    listAssetHistory(assetId, scopes = []) {
+      const from = scopeCondition(scopes, { city: 'ef.city', department: 'ef.department' });
+      const to = scopeCondition(scopes, { city: 'et.city', department: 'et.department' });
       return db
         .prepare(
           `SELECT m.*,COALESCE(m.occurred_at,m.created_at) occurred_at,
           u.name responsible_user,
-          ef.name employee_from,et.name employee_to
+          CASE WHEN ${from.sql} THEN ef.name END employee_from,
+          CASE WHEN ${to.sql} THEN et.name END employee_to
           FROM movements m LEFT JOIN users u ON u.id=m.responsible_user_id
           LEFT JOIN employees ef ON ef.id=m.employee_from_id
           LEFT JOIN employees et ON et.id=m.employee_to_id
           WHERE asset_id=? ORDER BY occurred_at DESC`
         )
-        .all(assetId);
+        .all(...from.params, ...to.params, assetId);
     }
   };
 }

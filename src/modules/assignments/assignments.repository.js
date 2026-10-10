@@ -1,4 +1,7 @@
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
+
 function createAssignmentsRepository(db) {
+  registerScopeFunction(db);
   return {
     findOpenForAsset(assetId) {
       return db
@@ -16,13 +19,20 @@ function createAssignmentsRepository(db) {
         'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
       ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
     },
-    listEmployeeAssets(employeeId) {
+    listEmployeeAssets(employeeId, scopes = []) {
+      const scope = scopeCondition(scopes, {
+        city: 'a.city',
+        equipment_type: 'a.equipment_type',
+        department: 'e.department'
+      });
       return db
         .prepare(
           `SELECT a.* FROM assets a JOIN assignments s
-          ON s.asset_id=a.id AND s.returned_at IS NULL WHERE s.employee_id=?`
+          ON s.asset_id=a.id AND s.returned_at IS NULL
+          JOIN employees e ON e.id=s.employee_id
+          WHERE s.employee_id=? AND ${scope.sql}`
         )
-        .all(employeeId);
+        .all(employeeId, ...scope.params);
     },
     listForOffboard(employeeId) {
       return db

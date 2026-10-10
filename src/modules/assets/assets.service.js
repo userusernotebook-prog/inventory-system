@@ -1,27 +1,42 @@
 const { ValidationError } = require('../../shared/errors');
-const { NotFoundError } = require('../../shared/errors');
+const { ForbiddenError, NotFoundError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { ASSET_STATES } = require('./domain/asset-state-machine');
 const { pageResult } = require('../../shared/utils/query');
 
 function createAssetsService(db, repository, auditService, authService) {
+  const can = (user, permission) =>
+    typeof authService.can === 'function' && authService.can(user, permission);
+  // Valor só com asset:view_value; quem está com o ativo só com employee:read e
+  // se essa pessoa estiver no alcance.
   function present(asset, user) {
     const value = { ...asset };
-    if (typeof authService.can !== 'function' || !authService.can(user, 'asset:view_value')) {
-      delete value.acquisition_value;
+    if (!can(user, 'asset:view_value')) delete value.acquisition_value;
+    if (!can(user, 'employee:read') || !asset.holder_in_scope) {
+      value.employee_id = null;
+      value.employee_name = null;
+      value.employee_department = null;
     }
+    delete value.holder_in_scope;
     return value;
   }
 
   return {
     list(options, user) {
-      const result = repository.list(options, authService.scopes(user));
+      const result = repository.list(options, authService.scopes(user), {
+        holderSearch: can(user, 'employee:read')
+      });
       return pageResult({ ...options, ...result, items: result.items.map((asset) => present(asset, user)) });
     },
     get(id, user) {
-      const asset = repository.findById(id);
-      if (!asset) throw new NotFoundError('Ativo não encontrado.');
-      authService.assertScope(user, asset);
+      const scopes = authService.scopes(user);
+      const asset = repository.findById(id, scopes);
+      if (!asset) {
+        if (scopes.length && repository.findById(id)) {
+          throw new ForbiddenError('Seu alcance não permite acessar este registro.');
+        }
+        throw new NotFoundError('Ativo não encontrado.');
+      }
       return present(asset, user);
     },
     create(body, technician) {

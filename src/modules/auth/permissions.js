@@ -29,7 +29,9 @@ const PERMISSIONS = Object.freeze([
 ]);
 
 // Exclusivas do ADMIN: nunca concedidas por perfil ou permissão individual.
-const ADMIN_ONLY_PERMISSIONS = Object.freeze(['user:manage', 'request:approve']);
+// audit:read entra aqui porque a auditoria (e o status de backup e a
+// documentação da API) não tem alcance: só o admin, que não tem alcance, a lê.
+const ADMIN_ONLY_PERMISSIONS = Object.freeze(['user:manage', 'request:approve', 'audit:read']);
 
 const known = new Set(PERMISSIONS);
 const adminOnly = new Set(ADMIN_ONLY_PERMISSIONS);

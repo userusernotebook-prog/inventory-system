@@ -44,18 +44,17 @@ test('bloqueia origem cruzada e mantém compatibilidade para clientes sem cabeç
   assert.equal(internal.nextError, undefined);
 });
 
-test('protege detalhe do ativo contra IDOR ao aplicar alcance no serviço', () => {
+test('protege detalhe do ativo contra IDOR com o alcance aplicado no repository', () => {
+  // O repository só devolve o ativo dentro do alcance; fora dele o service responde 403.
   const service = createAssetsService(
     null,
-    { findById: () => ({ id: 7, city: 'Rio de Janeiro' }) },
-    { logUser() {} },
     {
-      assertScope() {
-        throw new ForbiddenError('Seu alcance não permite acessar este registro.');
-      }
-    }
+      findById: (_id, scopes) => (scopes?.length ? undefined : { id: 7, city: 'Rio de Janeiro' })
+    },
+    { logUser() {} },
+    { scopes: () => [{ scope_type: 'city', scope_value: 'São Paulo' }] }
   );
-  assert.throws(() => service.get(7, { id: 2 }), /alcance/);
+  assert.throws(() => service.get(7, { id: 2 }), ForbiddenError);
 });
 
 test('rotas críticas de aprovação exigem permissão granular, sem apenas autenticação', () => {

@@ -1,4 +1,7 @@
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
+
 function createOffboardingRepository(db) {
+  registerScopeFunction(db);
   return {
     start(employeeId, date, reason) {
       db.prepare(
@@ -55,16 +58,19 @@ function createOffboardingRepository(db) {
         .all(employeeId, employeeId);
       return Object.fromEntries(counts.map((row) => [row.status, row.count]));
     },
-    checklistAssets(employeeId) {
+    // O funcionário já foi conferido no alcance; os itens seguem cidade e tipo.
+    checklistAssets(employeeId, scopes = []) {
+      const scope = scopeCondition(scopes, { city: 'a.city', equipment_type: 'a.equipment_type' });
       return db
         .prepare(
           `SELECT DISTINCT a.id,a.hostname,a.serial,a.equipment_type,a.status
           FROM assets a
           LEFT JOIN assignments ass ON ass.asset_id=a.id AND ass.returned_at IS NULL
-          WHERE ass.employee_id=? OR a.id IN (SELECT asset_id FROM asset_receipts WHERE employee_id=?)
+          WHERE (ass.employee_id=? OR a.id IN (SELECT asset_id FROM asset_receipts WHERE employee_id=?))
+            AND ${scope.sql}
           ORDER BY a.id`
         )
-        .all(employeeId, employeeId);
+        .all(employeeId, employeeId, ...scope.params);
     },
     // Ativos que entraram na devolução deste desligamento (ou ainda estão com a
     // pessoa) e não têm recibo de recebimento.

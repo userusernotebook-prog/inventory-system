@@ -30,17 +30,17 @@ function requireCompletedOnboarding(req, res, next) {
   return next();
 }
 function requirePermission(authService, permission) {
-  return [
-    requireAuthentication(authService),
-    (req, res, next) => {
-      try {
-        authService.authorize(req.user, permission);
-        next();
-      } catch (error) {
-        next(error);
-      }
+  const authorize = (req, res, next) => {
+    try {
+      authService.authorize(req.user, permission);
+      next();
+    } catch (error) {
+      next(error);
     }
-  ];
+  };
+  // Exposto para a varredura de rotas descobrir a permissão exigida.
+  authorize.requiredPermission = permission;
+  return [requireAuthentication(authService), authorize];
 }
 function requireOnboarding(authService) {
   return [

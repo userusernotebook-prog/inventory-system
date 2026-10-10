@@ -1,4 +1,4 @@
-const { NotFoundError, ValidationError } = require('../../shared/errors');
+const { ForbiddenError, NotFoundError, ValidationError } = require('../../shared/errors');
 const { text, optionalDate } = require('../../shared/utils/text');
 const { pageResult } = require('../../shared/utils/query');
 
@@ -13,6 +13,16 @@ function createEmployeesService(db, repository, auditService, authService) {
     }
     return value;
   }
+  // Leitura filtrada pelo alcance no repository: 403 se existe fora do alcance.
+  function findVisible(id, user) {
+    const scopes = authService.scopes(user);
+    const employee = repository.findById(id, scopes);
+    if (employee) return employee;
+    if (scopes.length && repository.findById(id)) {
+      throw new ForbiddenError('Seu alcance não permite acessar este registro.');
+    }
+    throw new NotFoundError('Funcionário não encontrado.');
+  }
   return {
     list(options, user) {
       const result = repository.list(options, authService.scopes(user));
@@ -23,15 +33,10 @@ function createEmployeesService(db, repository, auditService, authService) {
       });
     },
     get(id, user) {
-      const employee = repository.findById(id);
-      if (!employee) throw new NotFoundError('Funcionário não encontrado.');
-      authService.assertScope(user, employee);
-      return present(employee, user);
+      return present(findVisible(id, user), user);
     },
     history(id, user) {
-      const employee = repository.findById(id);
-      if (!employee) throw new NotFoundError('Funcionário não encontrado.');
-      authService.assertScope(user, employee);
+      findVisible(id, user);
       return repository.listEvents(id).map((event) => ({
         ...event,
         details: user.profile_base === 'CONSULTA' ? undefined : event.details

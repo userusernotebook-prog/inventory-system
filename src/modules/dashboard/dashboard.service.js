@@ -2,10 +2,16 @@ const { ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
 
-function createDashboardService(repository) {
+function createDashboardService(repository, authService) {
+  // Contagens respeitam o alcance; nomes só com employee:read e listas de
+  // chamados só com ticket:read.
+  const visibility = (user) => ({
+    employees: authService.can(user, 'employee:read'),
+    tickets: authService.can(user, 'ticket:read')
+  });
   return {
-    summary: () => repository.summary(),
-    report(query) {
+    summary: (user) => repository.summary(authService.scopes(user), visibility(user)),
+    report(query, user) {
       const filters = {
         year: text(query.year),
         month: text(query.month),
@@ -29,7 +35,7 @@ function createDashboardService(repository) {
       if (filters.assetStatus && !Object.values(ASSET_STATES).includes(filters.assetStatus)) {
         throw new ValidationError('Status de ativo inválido.');
       }
-      return repository.report(filters);
+      return repository.report(filters, authService.scopes(user), visibility(user));
     }
   };
 }

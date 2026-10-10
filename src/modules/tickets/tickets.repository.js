@@ -1,4 +1,5 @@
 const { likeContains } = require('../../shared/utils/query');
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
 
 const SORT_COLUMNS = {
   opened_at: 'tk.opened_at',
@@ -7,16 +8,28 @@ const SORT_COLUMNS = {
   ticket_number: 'tk.ticket_number'
 };
 
+// Chamado: cidade e departamento de quem abriu; tipo do equipamento do chamado
+// (chamado sem equipamento fica fora de um alcance por tipo).
+const TICKET_SCOPE = {
+  city: 'e.city',
+  department: 'e.department',
+  equipment_type: 'a.equipment_type'
+};
+
 function createTicketsRepository(db) {
+  registerScopeFunction(db);
   return {
-    list(options, scopes = []) {
+    list(options, scopes = [], { employeeSearch = true } = {}) {
       const where = ['1=1'];
       const params = [];
       if (options.q) {
+        const like = likeContains(options.q);
         where.push(
-          "(tk.ticket_number LIKE ? ESCAPE '\\' OR tk.description LIKE ? ESCAPE '\\' OR e.name LIKE ? ESCAPE '\\')"
+          employeeSearch
+            ? "(tk.ticket_number LIKE ? ESCAPE '\\' OR tk.description LIKE ? ESCAPE '\\' OR e.name LIKE ? ESCAPE '\\')"
+            : "(tk.ticket_number LIKE ? ESCAPE '\\' OR tk.description LIKE ? ESCAPE '\\')"
         );
-        params.push(...Array(3).fill(likeContains(options.q)));
+        params.push(...Array(employeeSearch ? 3 : 2).fill(like));
       }
       for (const field of ['status', 'priority', 'employee_id']) {
         if (options[field]) {
@@ -24,15 +37,9 @@ function createTicketsRepository(db) {
           params.push(options[field]);
         }
       }
-      for (const type of ['city', 'department']) {
-        const values = scopes
-          .filter((scope) => scope.scope_type === type)
-          .map((scope) => scope.scope_value);
-        if (values.length) {
-          where.push(`lower(e.${type}) IN (${values.map(() => 'lower(?)').join(',')})`);
-          params.push(...values);
-        }
-      }
+      const scope = scopeCondition(scopes, TICKET_SCOPE);
+      where.push(scope.sql);
+      params.push(...scope.params);
       const joins = ` FROM tickets tk JOIN employees e ON e.id=tk.employee_id
         LEFT JOIN assets a ON a.id=tk.asset_id LEFT JOIN users u ON u.id=tk.responsible_user_id`;
       const clause = ` WHERE ${where.join(' AND ')}`;
@@ -71,8 +78,9 @@ function createTicketsRepository(db) {
     findById(id) {
       return db
         .prepare(
-          `SELECT tk.*, e.name employee_name, e.city, e.department
+          `SELECT tk.*, e.name employee_name, e.city, e.department, a.equipment_type
            FROM tickets tk JOIN employees e ON e.id=tk.employee_id
+           LEFT JOIN assets a ON a.id=tk.asset_id
            WHERE tk.id=?`
         )
         .get(id);

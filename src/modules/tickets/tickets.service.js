@@ -5,8 +5,16 @@ const { pageResult } = require('../../shared/utils/query');
 function createTicketsService(db, repository, auditService, employeesRepository, authService) {
   return {
     list(options, user) {
-      const result = repository.list(options, authService.scopes(user));
-      return pageResult({ ...options, ...result });
+      // Nome de funcionário só com employee:read (nem como critério de busca).
+      const showEmployees =
+        typeof authService.can === 'function' && authService.can(user, 'employee:read');
+      const result = repository.list(options, authService.scopes(user), {
+        employeeSearch: showEmployees
+      });
+      const items = showEmployees
+        ? result.items
+        : result.items.map((ticket) => ({ ...ticket, employee_name: null }));
+      return pageResult({ ...options, ...result, items });
     },
     create(body, technician) {
       if (!Number(body.employee_id) || !text(body.description)) {

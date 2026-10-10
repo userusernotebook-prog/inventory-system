@@ -6,6 +6,7 @@ const { pageResult } = require('../../shared/utils/query');
 const { decryptTotpSecret, encryptTotpSecret } = require('./totp-crypto');
 const { resolveTotpEncryptionKey } = require('../../config/totp-key');
 const { isAdminOnly, isKnownPermission } = require('./permissions');
+const { matchesScope } = require('../../db/scope');
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -73,24 +74,16 @@ function createAuthService(repository, auditService) {
     );
   }
 
+  // Mesma regra do filtro SQL (src/db/scope.js), para registros já carregados ou
+  // dados novos. Atributo ausente no registro = alcance não se aplica.
   function isInScope(user, resource) {
-    const valuesByType = new Map();
-    for (const scope of scopesOf(user)) {
-      const values = valuesByType.get(scope.scope_type) || [];
-      values.push(String(scope.scope_value).trim().toLocaleLowerCase('pt-BR'));
-      valuesByType.set(scope.scope_type, values);
-    }
-    const resourceValues = {
-      city: resource.city,
-      department: resource.department || resource.employee_department,
-      equipment_type: resource.equipment_type
-    };
-    return [...valuesByType].every(([type, allowed]) => {
-      const value = String(resourceValues[type] || '')
-        .trim()
-        .toLocaleLowerCase('pt-BR');
-      return allowed.includes(value);
-    });
+    const values = {};
+    if (resource.city !== undefined) values.city = resource.city;
+    if (resource.equipment_type !== undefined) values.equipment_type = resource.equipment_type;
+    if (resource.department !== undefined) values.department = resource.department;
+    else if (resource.employee_department !== undefined)
+      values.department = resource.employee_department;
+    return matchesScope(scopesOf(user), values);
   }
   async function login(input) {
     const user = repository.findByEmail(String(input.email || '').trim());

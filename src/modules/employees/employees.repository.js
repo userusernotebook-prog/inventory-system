@@ -1,4 +1,5 @@
 const { likeContains } = require('../../shared/utils/query');
+const { registerScopeFunction, scopeCondition } = require('../../db/scope');
 
 const SORT_COLUMNS = {
   name: 'name',
@@ -9,19 +10,17 @@ const SORT_COLUMNS = {
   created_at: 'created_at'
 };
 
+// Tipo de equipamento não se aplica a funcionários.
+const EMPLOYEE_SCOPE = { city: 'city', department: 'department' };
+
 function addScope(sql, params, scopes) {
-  for (const type of ['city', 'department']) {
-    const values = scopes
-      .filter((scope) => scope.scope_type === type)
-      .map((scope) => scope.scope_value);
-    if (values.length) {
-      sql.push(`lower(${type}) IN (${values.map(() => 'lower(?)').join(',')})`);
-      params.push(...values);
-    }
-  }
+  const scope = scopeCondition(scopes, EMPLOYEE_SCOPE);
+  sql.push(scope.sql);
+  params.push(...scope.params);
 }
 
 function createEmployeesRepository(db) {
+  registerScopeFunction(db);
   return {
     list(options, scopes = []) {
       const where = [];
@@ -52,8 +51,12 @@ function createEmployeesRepository(db) {
         .all(...params, options.pageSize, (options.page - 1) * options.pageSize);
       return { items, total };
     },
-    findById(id) {
-      return db.prepare('SELECT * FROM employees WHERE id=?').get(id);
+    // Sem alcance (undefined), devolve o registro sem filtro: uso interno de regras.
+    findById(id, scopes) {
+      const scope = scopeCondition(scopes || [], EMPLOYEE_SCOPE);
+      return db
+        .prepare(`SELECT * FROM employees WHERE id=? AND ${scope.sql}`)
+        .get(id, ...scope.params);
     },
     listEvents(employeeId) {
       return db
