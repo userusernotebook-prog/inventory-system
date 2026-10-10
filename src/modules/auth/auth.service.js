@@ -104,6 +104,9 @@ function createAuthService(repository, auditService) {
       if (!can(user, permission))
         throw new ForbiddenError('Você não tem permissão para esta operação.');
     },
+    can(user, permission) {
+      return Boolean(user) && can(user, permission);
+    },
     effectivePermissions(user) {
       if (!user) throw new ValidationError('Usuário não encontrado.');
       return effectivePermissions(user);

@@ -99,7 +99,7 @@ test('servico de funcionarios mascara dados, impede duplicidade e preserva regra
   assert.equal(service.get(1, consultation).personal_phone, null);
   assert.throws(() => service.create({ name: '' }, user), /Nome/);
   assert.throws(() => service.create({ name: 'Pessoa', code: 'DUP' }, user), /C.digo/);
-  assert.deepEqual(service.create({ name: 'Nova', code: 'F2' }, user), { id: 2 });
+  assert.deepEqual(service.create({ name: 'Nova', code: 'F2', hire_date: '' }, user), { id: 2 });
   assert.throws(() => service.update(1, { status: 'desligado' }, user), /desligamento/);
   assert.throws(() => service.update(1, { offboarded_at: '2026-01-01' }, user), /s. pode/);
   assert.deepEqual(service.update(1, { department: 'RH' }, user), { ok: true });

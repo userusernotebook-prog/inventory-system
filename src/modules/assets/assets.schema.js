@@ -28,6 +28,7 @@ const fields = {
   condition_text: text(500),
   city: text(120),
   location: text(160),
+  acquisition_value: z.coerce.number().min(0).max(100000000).optional().or(z.literal('')),
   activated_at: date,
   replaced_at: date
 };

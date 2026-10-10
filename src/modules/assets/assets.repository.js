@@ -76,8 +76,8 @@ function createAssetsRepository(db) {
         .prepare(
           `INSERT INTO assets
           (hostname,equipment_type,manufacturer,model,serial,description,imei1,imei2,
-          apple_id,reference,condition_text,city,location,status,activated_at,replaced_at,created_at,updated_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          apple_id,reference,condition_text,city,location,acquisition_value,status,activated_at,replaced_at,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.hostname,
@@ -93,6 +93,7 @@ function createAssetsRepository(db) {
           input.condition_text,
           input.city,
           input.location,
+          input.acquisition_value,
           input.status,
           input.activated_at,
           input.replaced_at,
@@ -104,7 +105,7 @@ function createAssetsRepository(db) {
     update(id, input) {
       db.prepare(
         `UPDATE assets SET hostname=?,equipment_type=?,manufacturer=?,model=?,serial=?,description=?,
-          imei1=?,imei2=?,apple_id=?,reference=?,condition_text=?,city=?,location=?,updated_at=? WHERE id=?`
+          imei1=?,imei2=?,apple_id=?,reference=?,condition_text=?,city=?,location=?,acquisition_value=?,updated_at=? WHERE id=?`
       ).run(
         input.hostname,
         input.equipment_type,
@@ -119,6 +120,7 @@ function createAssetsRepository(db) {
         input.condition_text,
         input.city,
         input.location,
+        input.acquisition_value,
         new Date().toISOString(),
         id
       );

@@ -28,6 +28,15 @@ function createEmployeesService(db, repository, auditService, authService) {
       authService.assertScope(user, employee);
       return present(employee, user);
     },
+    history(id, user) {
+      const employee = repository.findById(id);
+      if (!employee) throw new NotFoundError('Funcionário não encontrado.');
+      authService.assertScope(user, employee);
+      return repository.listEvents(id).map((event) => ({
+        ...event,
+        details: user.profile_base === 'CONSULTA' ? undefined : event.details
+      }));
+    },
     create(body, technician) {
       if (!text(body.name)) throw new ValidationError('Nome é obrigatório.');
       authService.assertScope(technician, body);
@@ -45,6 +54,7 @@ function createEmployeesService(db, repository, auditService, authService) {
           location: text(body.location),
           corporate_phone: text(body.corporate_phone),
           personal_phone: text(body.personal_phone),
+          hire_date: optionalDate(body.hire_date, 'Data de admissão'),
           status: body.status === 'desligado' ? 'desligado' : 'ativo'
         });
         auditService.logUser(technician, 'create', 'employee', id, {

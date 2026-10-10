@@ -42,6 +42,15 @@ async function seed(db) {
     0,
     null
   );
+  insertUser.run(
+    'Consulta E2E',
+    'consulta.e2e@example.test',
+    passwordHash,
+    'CONSULTA',
+    0,
+    0,
+    null
+  );
   const technicianId = insertUser.run(
     'Tecnico E2E',
     'tecnico.e2e@example.test',

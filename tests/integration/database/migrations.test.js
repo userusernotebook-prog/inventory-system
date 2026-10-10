@@ -94,7 +94,10 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
-        assert.equal(migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n, 10);
+        assert.equal(
+          migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n,
+          fs.readdirSync(path.join(projectDir, 'src', 'db', 'migrations')).filter((name) => name.endsWith('.sql')).length
+        );
         assert.equal(
           migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
           crypto.createHash('sha256').update(initSql.replace(/\r\n/g, '\n')).digest('hex')

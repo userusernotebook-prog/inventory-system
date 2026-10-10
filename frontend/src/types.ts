@@ -36,6 +36,10 @@ export type Employee = {
   department?: string;
   status: string;
   corporate_phone?: string;
+  personal_phone?: string;
+  location?: string;
+  cost_center?: string;
+  hire_date?: string | null;
   created_at?: string;
 };
 export type Asset = {
@@ -49,6 +53,10 @@ export type Asset = {
   employee_name?: string;
   city?: string;
   updated_at?: string;
+  manufacturer?: string;
+  description?: string;
+  location?: string;
+  acquisition_value?: number;
 };
 export type Approval = {
   id: number;

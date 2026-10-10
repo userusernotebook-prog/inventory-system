@@ -19,6 +19,12 @@ function createEmployeesRoutes(service, authService) {
     validate(schema.params, 'params'),
     controller.get
   );
+  router.get(
+    '/api/employees/:id/history',
+    ...requirePermission(authService, 'employee:read'),
+    validate(schema.params, 'params'),
+    controller.history
+  );
   router.post(
     '/api/employees',
     ...requirePermission(authService, 'employee:create'),

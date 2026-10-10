@@ -55,6 +55,16 @@ function createEmployeesRepository(db) {
     findById(id) {
       return db.prepare('SELECT * FROM employees WHERE id=?').get(id);
     },
+    listEvents(employeeId) {
+      return db
+        .prepare(
+          `SELECT event.id,event.event_type,event.details,event.created_at,u.name actor_name
+          FROM employee_events event
+          LEFT JOIN users u ON u.id=event.actor_user_id
+          WHERE event.employee_id=? ORDER BY event.id DESC`
+        )
+        .all(employeeId);
+    },
     findActiveById(id) {
       return db.prepare("SELECT * FROM employees WHERE id=? AND status='ativo'").get(id);
     },
@@ -68,8 +78,8 @@ function createEmployeesRepository(db) {
       const result = db
         .prepare(
           `INSERT INTO employees
-          (code,name,email,city,department,location,corporate_phone,personal_phone,status,created_at,updated_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?)`
+          (code,name,email,city,department,location,corporate_phone,personal_phone,hire_date,status,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.code,
@@ -80,6 +90,7 @@ function createEmployeesRepository(db) {
           input.location,
           input.corporate_phone,
           input.personal_phone,
+          input.hire_date,
           input.status,
           now,
           now

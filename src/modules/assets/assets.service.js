@@ -5,16 +5,24 @@ const { ASSET_STATES } = require('./domain/asset-state-machine');
 const { pageResult } = require('../../shared/utils/query');
 
 function createAssetsService(db, repository, auditService, authService) {
+  function present(asset, user) {
+    const value = { ...asset };
+    if (typeof authService.can !== 'function' || !authService.can(user, 'asset:view_value')) {
+      delete value.acquisition_value;
+    }
+    return value;
+  }
+
   return {
     list(options, user) {
       const result = repository.list(options, authService.scopes(user));
-      return pageResult({ ...options, ...result });
+      return pageResult({ ...options, ...result, items: result.items.map((asset) => present(asset, user)) });
     },
     get(id, user) {
       const asset = repository.findById(id);
       if (!asset) throw new NotFoundError('Ativo não encontrado.');
       authService.assertScope(user, asset);
-      return asset;
+      return present(asset, user);
     },
     create(body, technician) {
       if (!text(body.equipment_type)) {
@@ -38,10 +46,15 @@ function createAssetsService(db, repository, auditService, authService) {
             'condition_text',
             'city',
             'location',
+            'acquisition_value',
             'activated_at',
             'replaced_at'
           ]) {
             input[field] = text(body[field]);
+          }
+          input.acquisition_value = body.acquisition_value === '' ? null : body.acquisition_value;
+          if (input.acquisition_value !== undefined && input.acquisition_value !== null) {
+            authService.authorize(technician, 'asset:view_value');
           }
           // O cadastro cria um ativo disponível. Toda mudança posterior de estado
           // passa obrigatoriamente pela máquina de estados no módulo movements.
@@ -80,9 +93,18 @@ function createAssetsService(db, repository, auditService, authService) {
         'reference',
         'condition_text',
         'city',
-        'location'
+        'location',
+        'acquisition_value'
       ]) {
         input[field] = Object.hasOwn(body, field) ? text(body[field]) : current[field];
+      }
+      input.acquisition_value = Object.hasOwn(body, 'acquisition_value')
+        ? body.acquisition_value === ''
+          ? null
+          : body.acquisition_value
+        : current.acquisition_value;
+      if (input.acquisition_value !== current.acquisition_value) {
+        authService.authorize(user, 'asset:view_value');
       }
       authService.assertScope(user, input);
       db.transaction(() => {

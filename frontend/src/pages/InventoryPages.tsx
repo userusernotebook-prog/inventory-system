@@ -1,311 +1,52 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { api, queryString } from '../lib/api';
-import type { Asset, Employee, Page } from '../types';
+import { useForm } from 'react-hook-form';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { z } from 'zod';
+import { useAuth } from '../auth/AuthProvider';
 import { Empty, ErrorState, Loading, Status } from '../components/Feedback';
 import { Pagination } from '../components/Pagination';
+import { api, HttpError, queryString } from '../lib/api';
 import { canUser } from '../lib/permissions';
-import { useAuth } from '../auth/AuthProvider';
+import type { Asset, Employee, Page } from '../types';
 
-function ListToolbar({
-  search,
-  setSearch,
-  label
-}: {
-  search: string;
-  setSearch: (value: string) => void;
-  label: string;
-}) {
-  return (
-    <div className="mb-4 flex flex-wrap gap-3">
-      <input
-        className="field max-w-sm"
-        aria-label={`Buscar ${label}`}
-        value={search}
-        placeholder={`Buscar ${label}`}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-    </div>
-  );
-}
-export function EmployeesPage() {
-  const [page, setPage] = useState(1);
-  const [q, setQ] = useState('');
-  const query = useQuery({
-    queryKey: ['employees', page, q],
-    queryFn: () => api<Page<Employee>>(`/api/employees?${queryString({ page, pageSize: 25, q })}`)
-  });
-  if (query.isLoading) return <Loading />;
-  if (query.error) return <ErrorState error={query.error} />;
-  const data = query.data!;
-  return (
-    <section>
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Funcionários</h1>
-          <p className="text-slate-600">Cadastros, ativos vinculados e desligamentos.</p>
-        </div>
-      </div>
-      <ListToolbar
-        label="funcionários"
-        search={q}
-        setSearch={(value) => {
-          setQ(value);
-          setPage(1);
-        }}
-      />
-      {data.items.length === 0 ? (
-        <Empty />
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Departamento</th>
-                <th>Cidade</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((employee) => (
-                <tr key={employee.id}>
-                  <td>
-                    <Link
-                      className="font-semibold text-blue-700 hover:underline"
-                      to={`/employees/${employee.id}`}
-                    >
-                      {employee.name}
-                    </Link>
-                  </td>
-                  <td>{employee.email || '—'}</td>
-                  <td>{employee.department || '—'}</td>
-                  <td>{employee.city || '—'}</td>
-                  <td>
-                    <Status value={employee.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination data={data} onPage={setPage} />
-        </div>
-      )}
-    </section>
-  );
-}
-export function AssetsPage() {
-  const [page, setPage] = useState(1);
-  const [q, setQ] = useState('');
-  const query = useQuery({
-    queryKey: ['assets', page, q],
-    queryFn: () => api<Page<Asset>>(`/api/assets?${queryString({ page, pageSize: 25, q })}`)
-  });
-  if (query.isLoading) return <Loading />;
-  if (query.error) return <ErrorState error={query.error} />;
-  const data = query.data!;
-  return (
-    <section>
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Ativos</h1>
-          <p className="text-slate-600">Inventário e situação operacional.</p>
-        </div>
-      </div>
-      <ListToolbar
-        label="ativos"
-        search={q}
-        setSearch={(value) => {
-          setQ(value);
-          setPage(1);
-        }}
-      />
-      {data.items.length === 0 ? (
-        <Empty />
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Funcionário</th>
-                <th>Hostname</th>
-                <th>Equipamento</th>
-                <th>Modelo</th>
-                <th>Serial</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((asset) => (
-                <tr key={asset.id}>
-                  <td>{asset.employee_name || '—'}</td>
-                  <td>
-                    <Link
-                      className="font-semibold text-blue-700 hover:underline"
-                      to={`/assets/${asset.id}`}
-                    >
-                      {asset.hostname || '—'}
-                    </Link>
-                  </td>
-                  <td>{asset.equipment_type}</td>
-                  <td>{asset.model || '—'}</td>
-                  <td>{asset.serial || '—'}</td>
-                  <td>
-                    <Status value={asset.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination data={data} onPage={setPage} />
-        </div>
-      )}
-    </section>
-  );
-}
-export function AssetDetailPage() {
-  const { id } = useParams();
-  const asset = useQuery({
-    queryKey: ['asset', id],
-    queryFn: () => api<Asset>(`/api/assets/${id}`)
-  });
-  const history = useQuery({
-    queryKey: ['asset-history', id],
-    queryFn: () =>
-      api<
-        Array<{
-          id: number;
-          from_status: string;
-          to_status: string;
-          movement_type: string;
-          occurred_at: string;
-          reason?: string;
-        }>
-      >(`/api/assets/${id}/history`)
-  });
-  if (asset.isLoading || history.isLoading) return <Loading />;
-  if (asset.error || history.error) return <ErrorState error={asset.error || history.error} />;
-  const current = asset.data!;
-  return (
-    <section>
-      <Link className="text-sm text-blue-700" to="/assets">
-        ← Voltar para ativos
-      </Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {current.hostname || current.serial || `Ativo #${current.id}`}
-          </h1>
-          <p className="text-slate-600">
-            {current.equipment_type} · {current.model || 'Sem modelo'}
-          </p>
-        </div>
-        <Status value={current.status} />
-      </div>
-      <div className="mt-6 grid gap-5 lg:grid-cols-3">
-        <section className="card lg:col-span-2">
-          <h2 className="font-bold">Linha do tempo</h2>
-          <ol className="mt-4 space-y-4 border-l border-slate-200 pl-5">
-            {history.data?.map((item) => (
-              <li key={item.id}>
-                <p className="font-semibold">
-                  {item.from_status || 'Inicial'} → {item.to_status}
-                </p>
-                <p className="text-sm text-slate-600">
-                  {item.movement_type} ·{' '}
-                  {new Intl.DateTimeFormat('pt-BR', {
-                    dateStyle: 'short',
-                    timeStyle: 'short',
-                    timeZone: 'America/Sao_Paulo'
-                  }).format(new Date(item.occurred_at))}
-                </p>
-                {item.reason && <p className="text-sm">{item.reason}</p>}
-              </li>
-            ))}
-          </ol>
-        </section>
-        <aside className="card">
-          <h2 className="font-bold">Status atual</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            As movimentações serão disponibilizadas no módulo de ativos.
-          </p>
-        </aside>
-      </div>
-    </section>
-  );
-}
-export function EmployeeDetailPage() {
-  const { id } = useParams();
-  const { user } = useAuth();
-  const employee = useQuery({
-    queryKey: ['employee', id],
-    queryFn: () => api<Employee>(`/api/employees/${id}`)
-  });
-  const assets = useQuery({
-    queryKey: ['employee-assets', id],
-    queryFn: () => api<Asset[]>(`/api/employees/${id}/assets`)
-  });
-  const checklist = useQuery({
-    queryKey: ['offboard-checklist', id],
-    enabled: canUser(user, 'employee:offboard'),
-    queryFn: () =>
-      api<{ status: string; assets: Record<string, number>; events: unknown[] }>(
-        `/api/employees/${id}/offboarding/checklist`
-      )
-  });
-  if (employee.isLoading || assets.isLoading) return <Loading />;
-  if (employee.error || assets.error) return <ErrorState error={employee.error || assets.error} />;
-  const person = employee.data!;
-  return (
-    <section>
-      <Link className="text-sm text-blue-700" to="/employees">
-        ← Voltar para funcionários
-      </Link>
-      <div className="mt-4 flex justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{person.name}</h1>
-          <p className="text-slate-600">
-            {person.department || 'Sem departamento'} · {person.city || 'Sem cidade'}
-          </p>
-        </div>
-      </div>
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
-        <section className="card">
-          <h2 className="font-bold">Ativos vinculados</h2>
-          {assets.data?.length ? (
-            <ul className="mt-3 space-y-2">
-              {assets.data.map((asset) => (
-                <li key={asset.id}>
-                  <Link className="text-blue-700 hover:underline" to={`/assets/${asset.id}`}>
-                    {asset.equipment_type} · {asset.hostname || asset.serial}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-slate-500">Sem ativos vinculados.</p>
-          )}
-        </section>
-        {canUser(user, 'employee:offboard') && (
-          <section className="card">
-            <h2 className="font-bold">Checklist de desligamento</h2>
-            {checklist.isLoading ? (
-              <p className="mt-3 text-sm">Carregando checklist…</p>
-            ) : (
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                {Object.entries(checklist.data?.assets || {}).map(([status, count]) => (
-                  <div key={status} className="rounded bg-slate-50 p-3">
-                    <dt>{status.replaceAll('_', ' ')}</dt>
-                    <dd className="mt-1 text-lg font-bold">{count}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </section>
-        )}
-      </div>
-    </section>
-  );
-}
+const employeeSchema = z.object({ code: z.string().trim().max(64).optional(), name: z.string().trim().min(2, 'Informe o nome.').max(160), email: z.union([z.literal(''), z.string().trim().email('E-mail invalido.').max(254)]), department: z.string().trim().max(120).optional(), city: z.string().trim().max(120).optional(), location: z.string().trim().max(160).optional(), corporate_phone: z.string().trim().max(40).optional(), personal_phone: z.string().trim().max(40).optional(), cost_center: z.string().trim().max(80).optional(), hire_date: z.string().optional() });
+const assetSchema = z.object({ hostname: z.string().trim().max(120).optional(), equipment_type: z.string().trim().min(1, 'Informe o tipo de equipamento.').max(100), manufacturer: z.string().trim().max(100).optional(), model: z.string().trim().max(160).optional(), serial: z.string().trim().max(160).optional(), reference: z.string().trim().max(120).optional(), city: z.string().trim().max(120).optional(), location: z.string().trim().max(160).optional(), description: z.string().trim().max(2000).optional(), acquisition_value: z.string().refine((value) => !value || /^\d+(\.\d{1,2})?$/.test(value), 'Use um valor numerico positivo.') });
+type EmployeeValues = z.infer<typeof employeeSchema>;
+type AssetValues = z.infer<typeof assetSchema>;
+type MoveRule = { to: string; permission: string; label: string; approval?: boolean; employee?: boolean };
+type MoveValues = { employee_id: string; reason: string };
+const moveSchema = z.object({ employee_id: z.string(), reason: z.string().trim().min(3, 'Informe o motivo da confirmacao.').max(1000) });
+const rules: Record<string, MoveRule[]> = {
+  DISPONIVEL: [{ to: 'EM_USO', permission: 'asset:assign', label: 'Atribuir a funcionario', employee: true }, { to: 'BACKUP', permission: 'asset:send-backup', label: 'Enviar para backup' }, { to: 'EM_MANUTENCAO', permission: 'asset:send-maintenance', label: 'Enviar para manutencao' }, { to: 'EM_AVALIACAO', permission: 'asset:evaluate', label: 'Enviar para avaliacao' }, { to: 'DESATIVADO', permission: 'asset:deactivate', label: 'Solicitar desativacao', approval: true }],
+  EM_USO: [{ to: 'EM_USO', permission: 'asset:transfer', label: 'Solicitar transferencia', approval: true, employee: true }, { to: 'DISPONIVEL', permission: 'asset:receive', label: 'Receber equipamento' }, { to: 'PENDENTE_DEVOLUCAO', permission: 'asset:mark-return-pending', label: 'Marcar devolucao pendente' }, { to: 'BACKUP', permission: 'asset:send-backup', label: 'Enviar para backup' }, { to: 'EM_MANUTENCAO', permission: 'asset:send-maintenance', label: 'Enviar para manutencao' }, { to: 'EM_AVALIACAO', permission: 'asset:evaluate', label: 'Enviar para avaliacao' }, { to: 'DESATIVADO', permission: 'asset:deactivate', label: 'Solicitar desativacao', approval: true }],
+  PENDENTE_DEVOLUCAO: [{ to: 'EM_USO', permission: 'asset:assign', label: 'Atribuir a funcionario', employee: true }, { to: 'DISPONIVEL', permission: 'asset:receive', label: 'Receber equipamento' }, { to: 'BACKUP', permission: 'asset:send-backup', label: 'Enviar para backup' }, { to: 'EM_MANUTENCAO', permission: 'asset:send-maintenance', label: 'Enviar para manutencao' }, { to: 'EM_AVALIACAO', permission: 'asset:evaluate', label: 'Enviar para avaliacao' }],
+  BACKUP: [{ to: 'EM_USO', permission: 'asset:assign', label: 'Solicitar uso do backup', approval: true, employee: true }, { to: 'DISPONIVEL', permission: 'asset:receive', label: 'Receber equipamento' }, { to: 'EM_MANUTENCAO', permission: 'asset:send-maintenance', label: 'Enviar para manutencao' }, { to: 'EM_AVALIACAO', permission: 'asset:evaluate', label: 'Enviar para avaliacao' }, { to: 'DESATIVADO', permission: 'asset:deactivate', label: 'Solicitar desativacao', approval: true }],
+  EM_MANUTENCAO: [{ to: 'DISPONIVEL', permission: 'asset:return-maintenance', label: 'Retornar da manutencao' }, { to: 'BACKUP', permission: 'asset:return-maintenance', label: 'Retornar para backup' }, { to: 'EM_AVALIACAO', permission: 'asset:evaluate', label: 'Enviar para avaliacao' }],
+  EM_AVALIACAO: [{ to: 'DISPONIVEL', permission: 'asset:return-evaluation', label: 'Liberar equipamento' }, { to: 'BACKUP', permission: 'asset:send-backup', label: 'Enviar para backup' }, { to: 'EM_MANUTENCAO', permission: 'asset:send-maintenance', label: 'Enviar para manutencao' }, { to: 'DESATIVADO', permission: 'asset:deactivate', label: 'Solicitar desativacao', approval: true }],
+  DESATIVADO: []
+};
+const employeeSort = ['name', 'email', 'department', 'city', 'status', 'created_at'];
+const assetSort = ['hostname', 'equipment_type', 'model', 'serial', 'status', 'updated_at'];
+const message = (error: unknown) => error instanceof HttpError || error instanceof Error ? error.message : 'Nao foi possivel concluir a operacao.';
+const date = (value?: string | null) => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value)) : '-';
+function FieldError({ text }: { text?: string }) { return text ? <p className="field-error">{text}</p> : null; }
+
+function EmployeesFilters({ query }: { query: (values: Record<string, string>) => void }) { const [values, setValues] = useState({ q: '', status: '', city: '', department: '', sortBy: 'name', sortOrder: 'asc' }); const set = (key: string, value: string) => { const next = { ...values, [key]: value }; setValues(next); query(next); }; return <div className="mb-4 grid gap-3 md:grid-cols-3"><input className="field" aria-label="Buscar funcionarios" placeholder="Buscar nome, e-mail ou codigo" value={values.q} onChange={(e) => set('q', e.target.value)} /><select className="field" aria-label="Filtrar status" value={values.status} onChange={(e) => set('status', e.target.value)}><option value="">Todos os status</option><option value="ativo">Ativo</option><option value="em_desligamento">Em desligamento</option><option value="desligado">Desligado</option></select><input className="field" aria-label="Filtrar cidade" placeholder="Cidade" value={values.city} onChange={(e) => set('city', e.target.value)} /><input className="field" aria-label="Filtrar departamento" placeholder="Departamento" value={values.department} onChange={(e) => set('department', e.target.value)} /><select className="field" aria-label="Ordenar funcionarios" value={values.sortBy} onChange={(e) => set('sortBy', e.target.value)}>{employeeSort.map((item) => <option value={item} key={item}>{item.replace('_', ' ')}</option>)}</select><select className="field" aria-label="Direcao da ordenacao" value={values.sortOrder} onChange={(e) => set('sortOrder', e.target.value)}><option value="asc">Crescente</option><option value="desc">Decrescente</option></select></div>; }
+export function EmployeesPage() { const { user } = useAuth(); const [page, setPage] = useState(1); const [filters, setFilters] = useState<Record<string, string>>({ q: '', status: '', city: '', department: '', sortBy: 'name', sortOrder: 'asc' }); const result = useQuery({ queryKey: ['employees', page, filters], queryFn: () => api<Page<Employee>>(`/api/employees?${queryString({ page, pageSize: 25, ...filters })}`) }); if (result.isLoading) return <Loading />; if (result.error) return <ErrorState error={result.error} />; const data = result.data!; return <section><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Funcionarios</h1><p className="text-slate-600">Cadastros, ativos vinculados e historico.</p></div>{canUser(user, 'employee:create') && <Link className="btn-primary" to="/employees/new">Novo funcionario</Link>}</div><EmployeesFilters query={(next) => { setFilters(next); setPage(1); }} />{data.items.length === 0 ? <Empty /> : <div className="card overflow-x-auto"><table className="table"><thead><tr><th>Nome</th><th>E-mail</th><th>Departamento</th><th>Cidade</th><th>Status</th></tr></thead><tbody>{data.items.map((employee) => <tr key={employee.id}><td><Link className="font-semibold text-blue-700 hover:underline" to={`/employees/${employee.id}`}>{employee.name}</Link></td><td>{employee.email || '-'}</td><td>{employee.department || '-'}</td><td>{employee.city || '-'}</td><td><Status value={employee.status} /></td></tr>)}</tbody></table><Pagination data={data} onPage={setPage} /></div>}</section>; }
+
+function EmployeeForm({ employee }: { employee?: Employee }) { const navigate = useNavigate(); const form = useForm<EmployeeValues>({ resolver: zodResolver(employeeSchema), defaultValues: { code: employee?.code || '', name: employee?.name || '', email: employee?.email || '', department: employee?.department || '', city: employee?.city || '', location: employee?.location || '', corporate_phone: employee?.corporate_phone || '', personal_phone: employee?.personal_phone || '', cost_center: employee?.cost_center || '', hire_date: employee?.hire_date?.slice(0, 10) || '' } }); const submit = form.handleSubmit(async (values) => { try { if (employee) { await api(`/api/employees/${employee.id}`, { method: 'PUT', body: JSON.stringify(values) }); navigate(`/employees/${employee.id}`); } else { const result = await api<{ id: number }>('/api/employees', { method: 'POST', body: JSON.stringify(values) }); navigate(`/employees/${result.id}`); } } catch (error) { form.setError('root', { message: message(error) }); } }); return <form className="card mt-5 grid gap-4 md:grid-cols-2" noValidate onSubmit={submit}><label className="label">Nome<input className="field" {...form.register('name')} /></label><FieldError text={form.formState.errors.name?.message} /><label className="label">E-mail<input className="field" type="email" {...form.register('email')} /></label><FieldError text={form.formState.errors.email?.message} /><label className="label">Codigo<input className="field" {...form.register('code')} /></label><label className="label">Departamento<input className="field" {...form.register('department')} /></label><label className="label">Cidade<input className="field" {...form.register('city')} /></label><label className="label">Localizacao<input className="field" {...form.register('location')} /></label><label className="label">Telefone corporativo<input className="field" {...form.register('corporate_phone')} /></label><label className="label">Telefone pessoal<input className="field" {...form.register('personal_phone')} /></label><label className="label">Centro de custo<input className="field" {...form.register('cost_center')} /></label><label className="label">Data de admissao<input className="field" type="date" {...form.register('hire_date')} /></label>{form.formState.errors.root && <p className="field-error md:col-span-2" role="alert">{form.formState.errors.root.message}</p>}<div className="flex gap-3 md:col-span-2"><button className="btn-primary" type="submit" disabled={form.formState.isSubmitting}>{employee ? 'Salvar alteracoes' : 'Cadastrar funcionario'}</button><button className="btn-secondary" type="button" onClick={() => navigate(-1)}>Cancelar</button></div></form>; }
+export function NewEmployeePage() { return <section className="max-w-3xl"><Link className="text-sm text-blue-700" to="/employees">Voltar para funcionarios</Link><h1 className="mt-4 text-2xl font-bold">Novo funcionario</h1><EmployeeForm /></section>; }
+export function EditEmployeePage() { const { id } = useParams(); const item = useQuery({ queryKey: ['employee', id], queryFn: () => api<Employee>(`/api/employees/${id}`) }); if (item.isLoading) return <Loading />; if (item.error) return <ErrorState error={item.error} />; return <section className="max-w-3xl"><Link className="text-sm text-blue-700" to={`/employees/${id}`}>Voltar ao funcionario</Link><h1 className="mt-4 text-2xl font-bold">Editar funcionario</h1><EmployeeForm employee={item.data} /></section>; }
+
+function AssetsFilters({ query }: { query: (values: Record<string, string>) => void }) { const [values, setValues] = useState({ q: '', status: '', city: '', equipment_type: '', sortBy: 'updated_at', sortOrder: 'desc' }); const set = (key: string, value: string) => { const next = { ...values, [key]: value }; setValues(next); query(next); }; return <div className="mb-4 grid gap-3 md:grid-cols-3"><input className="field" aria-label="Buscar ativos" placeholder="Buscar serial, hostname ou funcionario" value={values.q} onChange={(e) => set('q', e.target.value)} /><select className="field" aria-label="Filtrar status" value={values.status} onChange={(e) => set('status', e.target.value)}><option value="">Todos os status</option>{Object.keys(rules).map((item) => <option key={item}>{item}</option>)}</select><input className="field" aria-label="Filtrar cidade" placeholder="Cidade" value={values.city} onChange={(e) => set('city', e.target.value)} /><input className="field" aria-label="Filtrar tipo de equipamento" placeholder="Tipo de equipamento" value={values.equipment_type} onChange={(e) => set('equipment_type', e.target.value)} /><select className="field" aria-label="Ordenar ativos" value={values.sortBy} onChange={(e) => set('sortBy', e.target.value)}>{assetSort.map((item) => <option value={item} key={item}>{item.replace('_', ' ')}</option>)}</select><select className="field" aria-label="Direcao da ordenacao" value={values.sortOrder} onChange={(e) => set('sortOrder', e.target.value)}><option value="asc">Crescente</option><option value="desc">Decrescente</option></select></div>; }
+export function AssetsPage() { const { user } = useAuth(); const [page, setPage] = useState(1); const [filters, setFilters] = useState<Record<string, string>>({ q: '', status: '', city: '', equipment_type: '', sortBy: 'updated_at', sortOrder: 'desc' }); const result = useQuery({ queryKey: ['assets', page, filters], queryFn: () => api<Page<Asset>>(`/api/assets?${queryString({ page, pageSize: 25, ...filters })}`) }); if (result.isLoading) return <Loading />; if (result.error) return <ErrorState error={result.error} />; const data = result.data!; return <section><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Ativos</h1><p className="text-slate-600">Inventario e situacao operacional.</p></div>{canUser(user, 'asset:create') && <Link className="btn-primary" to="/assets/new">Novo ativo</Link>}</div><AssetsFilters query={(next) => { setFilters(next); setPage(1); }} />{data.items.length === 0 ? <Empty /> : <div className="card overflow-x-auto"><table className="table"><thead><tr><th>Funcionario</th><th>Hostname</th><th>Equipamento</th><th>Modelo</th><th>Serial</th><th>Status</th></tr></thead><tbody>{data.items.map((asset) => <tr key={asset.id}><td>{asset.employee_name || '-'}</td><td><Link className="font-semibold text-blue-700 hover:underline" to={`/assets/${asset.id}`}>{asset.hostname || asset.serial || `Ativo #${asset.id}`}</Link></td><td>{asset.equipment_type}</td><td>{asset.model || '-'}</td><td>{asset.serial || '-'}</td><td><Status value={asset.status} /></td></tr>)}</tbody></table><Pagination data={data} onPage={setPage} /></div>}</section>; }
+
+function AssetForm({ asset }: { asset?: Asset }) { const { user } = useAuth(); const navigate = useNavigate(); const financial = canUser(user, 'asset:view_value'); const form = useForm<AssetValues>({ resolver: zodResolver(assetSchema), defaultValues: { hostname: asset?.hostname || '', equipment_type: asset?.equipment_type || '', manufacturer: asset?.manufacturer || '', model: asset?.model || '', serial: asset?.serial || '', reference: asset?.reference || '', city: asset?.city || '', location: asset?.location || '', description: asset?.description || '', acquisition_value: asset?.acquisition_value?.toFixed(2) || '' } }); const submit = form.handleSubmit(async (values) => { try { const body = { ...values, acquisition_value: financial ? values.acquisition_value : undefined }; if (asset) { await api(`/api/assets/${asset.id}`, { method: 'PUT', body: JSON.stringify(body) }); navigate(`/assets/${asset.id}`); } else { const result = await api<{ id: number }>('/api/assets', { method: 'POST', body: JSON.stringify(body) }); navigate(`/assets/${result.id}`); } } catch (error) { form.setError('root', { message: message(error) }); } }); return <form className="card mt-5 grid gap-4 md:grid-cols-2" noValidate onSubmit={submit}><label className="label">Tipo de equipamento<input className="field" {...form.register('equipment_type')} /></label><FieldError text={form.formState.errors.equipment_type?.message} /><label className="label">Hostname<input className="field" {...form.register('hostname')} /></label><label className="label">Fabricante<input className="field" {...form.register('manufacturer')} /></label><label className="label">Modelo<input className="field" {...form.register('model')} /></label><label className="label">Serial<input className="field" {...form.register('serial')} /></label><label className="label">Patrimonio / referencia<input className="field" {...form.register('reference')} /></label><label className="label">Cidade<input className="field" {...form.register('city')} /></label><label className="label">Localizacao<input className="field" {...form.register('location')} /></label>{financial && <label className="label">Valor de aquisicao<input className="field" inputMode="decimal" {...form.register('acquisition_value')} /></label>}<label className="label md:col-span-2">Descricao<textarea className="field min-h-24" {...form.register('description')} /></label>{form.formState.errors.root && <p className="field-error md:col-span-2" role="alert">{form.formState.errors.root.message}</p>}<div className="flex gap-3 md:col-span-2"><button className="btn-primary" type="submit" disabled={form.formState.isSubmitting}>{asset ? 'Salvar alteracoes' : 'Cadastrar ativo'}</button><button className="btn-secondary" type="button" onClick={() => navigate(-1)}>Cancelar</button></div></form>; }
+export function NewAssetPage() { return <section className="max-w-3xl"><Link className="text-sm text-blue-700" to="/assets">Voltar para ativos</Link><h1 className="mt-4 text-2xl font-bold">Novo ativo</h1><AssetForm /></section>; }
+export function EditAssetPage() { const { id } = useParams(); const item = useQuery({ queryKey: ['asset', id], queryFn: () => api<Asset>(`/api/assets/${id}`) }); if (item.isLoading) return <Loading />; if (item.error) return <ErrorState error={item.error} />; return <section className="max-w-3xl"><Link className="text-sm text-blue-700" to={`/assets/${id}`}>Voltar ao ativo</Link><h1 className="mt-4 text-2xl font-bold">Editar ativo</h1><AssetForm asset={item.data} /></section>; }
+
+function MoveDialog({ asset, rule, close }: { asset: Asset; rule: MoveRule; close: () => void }) { const client = useQueryClient(); const employees = useQuery({ queryKey: ['move-employees'], queryFn: () => api<Page<Employee>>('/api/employees?page=1&pageSize=100&status=ativo') }); const form = useForm<MoveValues>({ resolver: zodResolver(moveSchema), defaultValues: { employee_id: '', reason: '' } }); const mutation = useMutation({ mutationFn: (values: MoveValues) => api(`/api/assets/${asset.id}/move`, { method: 'POST', body: JSON.stringify({ to_status: rule.to, employee_id: values.employee_id ? Number(values.employee_id) : undefined, reason: values.reason || undefined }) }), onSuccess: async () => { await client.invalidateQueries({ queryKey: ['asset', String(asset.id)] }); await client.invalidateQueries({ queryKey: ['asset-history', String(asset.id)] }); close(); } }); const submit = form.handleSubmit(async (values) => { if (rule.employee && !values.employee_id) return form.setError('employee_id', { message: 'Selecione o funcionario.' }); try { await mutation.mutateAsync(values); } catch (error) { form.setError('root', { message: message(error) }); } }); return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-label="Confirmar movimentacao"><form className="card w-full max-w-lg space-y-4" noValidate onSubmit={submit}><h2 className="text-lg font-bold">Confirmar movimentacao</h2><p className="text-sm text-slate-600">{rule.label}: {asset.status} para {rule.to}.</p>{rule.employee && <label className="label">Funcionario de destino<select className="field" {...form.register('employee_id')}><option value="">Selecione</option>{employees.data?.items.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}</select></label>}<FieldError text={form.formState.errors.employee_id?.message} /><label className="label">Motivo<textarea className="field min-h-24" {...form.register('reason')} /></label><FieldError text={form.formState.errors.reason?.message} />{form.formState.errors.root && <p className="field-error" role="alert">{form.formState.errors.root.message}</p>}<div className="flex justify-end gap-3"><button className="btn-secondary" type="button" onClick={close}>Cancelar</button><button className="btn-primary" type="submit" disabled={mutation.isPending}>Confirmar</button></div></form></div>; }
+export function AssetDetailPage() { const { id } = useParams(); const { user } = useAuth(); const [move, setMove] = useState<MoveRule>(); const asset = useQuery({ queryKey: ['asset', id], queryFn: () => api<Asset>(`/api/assets/${id}`) }); const history = useQuery({ queryKey: ['asset-history', id], queryFn: () => api<Array<{ id: number; from_status: string; to_status: string; movement_type: string; occurred_at: string; reason?: string }>>(`/api/assets/${id}/history`) }); if (asset.isLoading || history.isLoading) return <Loading />; if (asset.error || history.error) return <ErrorState error={asset.error || history.error} />; const current = asset.data!; const valid = (rules[current.status] || []).filter((rule) => canUser(user, rule.permission)); return <section><Link className="text-sm text-blue-700" to="/assets">Voltar para ativos</Link><div className="mt-4 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">{current.hostname || current.serial || `Ativo #${current.id}`}</h1><p className="text-slate-600">{current.equipment_type} - {current.model || 'Sem modelo'}</p></div><div className="flex items-center gap-3"><Status value={current.status} />{canUser(user, 'asset:update') && <Link className="btn-secondary" to={`/assets/${current.id}/edit`}>Editar ativo</Link>}</div></div><div className="mt-6 grid gap-5 lg:grid-cols-3"><section className="card lg:col-span-2"><h2 className="font-bold">Linha do tempo</h2>{history.data?.length ? <ol className="mt-4 space-y-4 border-l border-slate-200 pl-5">{history.data.map((item) => <li key={item.id}><p className="font-semibold">{item.from_status || 'Inicial'} para {item.to_status}</p><p className="text-sm text-slate-600">{item.movement_type} - {date(item.occurred_at)}</p>{item.reason && <p className="text-sm">{item.reason}</p>}</li>)}</ol> : <p className="mt-3 text-sm text-slate-500">Sem movimentacoes registradas.</p>}</section><aside className="card"><h2 className="font-bold">Dados do ativo</h2><dl className="mt-3 space-y-2 text-sm"><div><dt className="text-slate-500">Serial</dt><dd>{current.serial || '-'}</dd></div><div><dt className="text-slate-500">Patrimonio</dt><dd>{current.reference || '-'}</dd></div><div><dt className="text-slate-500">Cidade</dt><dd>{current.city || '-'}</dd></div>{canUser(user, 'asset:view_value') && <div><dt className="text-slate-500">Valor de aquisicao</dt><dd>{current.acquisition_value === undefined ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(current.acquisition_value)}</dd></div>}</dl><h2 className="mt-6 font-bold">Acoes permitidas</h2>{valid.length === 0 ? <p className="mt-2 text-sm text-slate-500">Nenhuma acao permitida para seu perfil.</p> : <div className="mt-3 grid gap-2">{valid.map((rule) => rule.approval ? <Link className="btn-secondary text-center" to="/approvals/new" key={`${rule.to}-${rule.permission}`}>{rule.label}</Link> : <button className="btn-secondary" key={`${rule.to}-${rule.permission}`} onClick={() => setMove(rule)}>{rule.label}</button>)}</div>}</aside></div>{move && <MoveDialog asset={current} rule={move} close={() => setMove(undefined)} />}</section>; }
+export function EmployeeDetailPage() { const { id } = useParams(); const { user } = useAuth(); const employee = useQuery({ queryKey: ['employee', id], queryFn: () => api<Employee>(`/api/employees/${id}`) }); const assets = useQuery({ queryKey: ['employee-assets', id], queryFn: () => api<Asset[]>(`/api/employees/${id}/assets`) }); const history = useQuery({ queryKey: ['employee-history', id], queryFn: () => api<Array<{ id: number; event_type: string; actor_name?: string; created_at: string }>>(`/api/employees/${id}/history`) }); if (employee.isLoading || assets.isLoading || history.isLoading) return <Loading />; if (employee.error || assets.error || history.error) return <ErrorState error={employee.error || assets.error || history.error} />; const person = employee.data!; return <section><Link className="text-sm text-blue-700" to="/employees">Voltar para funcionarios</Link><div className="mt-4 flex flex-wrap justify-between gap-3"><div><h1 className="text-2xl font-bold">{person.name}</h1><p className="text-slate-600">{person.department || 'Sem departamento'} - {person.city || 'Sem cidade'}</p></div>{canUser(user, 'employee:update') && <Link className="btn-secondary" to={`/employees/${person.id}/edit`}>Editar funcionario</Link>}</div><div className="mt-6 grid gap-5 lg:grid-cols-2"><section className="card"><h2 className="font-bold">Ativos vinculados</h2>{assets.data?.length ? <ul className="mt-3 space-y-2">{assets.data.map((asset) => <li key={asset.id}><Link className="text-blue-700 hover:underline" to={`/assets/${asset.id}`}>{asset.equipment_type} - {asset.hostname || asset.serial}</Link></li>)}</ul> : <p className="mt-3 text-sm text-slate-500">Sem ativos vinculados.</p>}</section><section className="card"><h2 className="font-bold">Historico</h2>{history.data?.length ? <ol className="mt-3 space-y-3">{history.data.map((event) => <li key={event.id} className="border-l border-slate-200 pl-3"><p className="font-semibold">{event.event_type.replaceAll('_', ' ')}</p><p className="text-sm text-slate-600">{event.actor_name || 'Sistema'} - {date(event.created_at)}</p></li>)}</ol> : <p className="mt-3 text-sm text-slate-500">Sem eventos registrados.</p>}</section></div></section>; }

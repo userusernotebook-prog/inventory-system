@@ -6,6 +6,9 @@ function createEmployeesController(service) {
     get(req, res) {
       res.json(service.get(req.validated.params.id, req.user));
     },
+    history(req, res) {
+      res.json(service.history(req.validated.params.id, req.user));
+    },
     create(req, res) {
       res.json(service.create(req.validated.body, req.user));
     },

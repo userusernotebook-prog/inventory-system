@@ -6,7 +6,8 @@ const date = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a data no formato YYYY-MM-DD.')
   .optional()
-  .nullable();
+  .nullable()
+  .or(z.literal(''));
 const params = z.object({ id: z.coerce.number().int().positive() });
 const list = paginationSchema.extend({
   q: z.string().trim().max(120).optional(),

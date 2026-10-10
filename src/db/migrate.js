@@ -9,7 +9,10 @@ const legacyColumns = new Map([
   [4, 'hire_date']
 ]);
 const structuralMigrations = new Set([5, 6, 8]);
-const migrationRequirements = new Map([[9, [6, 7, 8]]]);
+const migrationRequirements = new Map([
+  [9, [6, 7, 8]],
+  [11, [6]]
+]);
 
 function applyStructuralMigration(db, sql, record) {
   db.pragma('foreign_keys = OFF');
