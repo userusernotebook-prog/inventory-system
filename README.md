@@ -129,33 +129,47 @@ O workflow `.github/workflows/ci.yml` roda lint, formatacao, tipos, testes, cobe
 
 1. Copie os certificados de uma autoridade valida para `deploy/certs/fullchain.pem` e `deploy/certs/privkey.pem`.
 2. Defina `APP_ORIGIN=https://seu-dominio` no ambiente de deploy.
-3. Inicie:
+3. Defina `AGE_RECIPIENT` com a chave publica age da copia externa e, de preferencia, `BACKUP_EXTERNAL_HOST_DIR` com a montagem do NAS (veja Backup e restauracao).
+4. Inicie:
 
 ```bash
 docker compose up -d --build
 ```
 
-O `Dockerfile` e multi-stage. `app` usa o volume nomeado `inventory-data` em `/app/data`; Nginx termina TLS em 443 e redireciona 80 para HTTPS. O compose nao deve ser iniciado antes dos certificados existirem, pois Nginx precisa deles para iniciar com HTTPS.
+O `Dockerfile` e multi-stage. `app` usa o volume nomeado `inventory-data` em `/app/data`; Nginx termina TLS em 443 e redireciona 80 para HTTPS. O compose nao deve ser iniciado antes dos certificados existirem, pois Nginx precisa deles para iniciar com HTTPS. Sem `AGE_RECIPIENT`, o servico `backup` recusa iniciar com a mensagem `backup_daemon_config_invalid` (codigo de saida 78); o Docker tenta reinicia-lo no maximo 3 vezes e para.
 
 ## Backup e restauracao
 
-O backup usa `better-sqlite3.backup`, inclui o WAL, executa `integrity_check` e `foreign_key_check`, aplica retencao e, quando `BACKUP_EXTERNAL_DIR` foi definido, grava e valida uma segunda copia fora do volume do banco.
+O backup usa `better-sqlite3.backup`, inclui o WAL, executa `integrity_check` e `foreign_key_check` na copia local e aplica retencao. Quando `BACKUP_EXTERNAL_DIR` esta definido, grava uma segunda copia **cifrada com age** para a chave publica `AGE_RECIPIENT`, fora do volume do banco. Como a chave privada nao fica no servidor, a copia externa nao e aberta nem validada como SQLite ali: o servidor confere apenas que o arquivo nao esta vazio e comeca com o cabecalho age (`age-encryption.org/v1`). A validacao completa e o teste de restauracao abaixo, feito com a chave privada.
 
 ```powershell
 npm run backup
 npm run backup:verify-restore
 ```
 
-No Docker, o servico `backup` executa no intervalo configurado e monta `BACKUP_EXTERNAL_HOST_DIR` como segunda copia. Use uma montagem de NAS, disco criptografado ou agente de backup do provedor; uma pasta no mesmo disco nao protege contra falha desse disco.
+Cada execucao registra em `backup-status.json` (pasta `BACKUP_DIR`) o resultado de cada etapa: copia local, retencao, copia externa e monitoramento. A copia local validada nunca e apagada por falha na copia externa, na criptografia ou no ping de `BACKUP_MONITOR_URL`; o ping so e enviado quando todas as etapas terminam sem falha. `npm run backup` termina com codigo 1 se alguma etapa falhar e com codigo 78 se a configuracao for invalida (por exemplo, `BACKUP_EXTERNAL_DIR` sem `AGE_RECIPIENT`). Com essa configuracao invalida a aplicacao tambem recusa iniciar.
+
+No Docker, o servico `backup` executa no intervalo configurado e monta `BACKUP_EXTERNAL_HOST_DIR` como destino da copia externa. Use uma montagem de NAS, disco criptografado ou agente de backup do provedor; uma pasta no mesmo disco nao protege contra falha desse disco. Se uma execucao falhar, o servico tenta de novo apos 1, 2, 4, 8... minutos, sem passar de `BACKUP_INTERVAL_SECONDS`, e volta ao intervalo normal apos um sucesso.
+
+Para criar o par de chaves age, em uma maquina segura (nao no servidor):
+
+```powershell
+age-keygen -o inventario-backup.key   # imprime a chave publica age1...: use-a em AGE_RECIPIENT
+# sem a CLI do age:
+node -e "import('age-encryption').then(async (a) => { const id = await a.generateIdentity(); console.log(id); console.log(await a.identityToRecipient(id)); })"
+```
+
+Guarde o arquivo da chave privada em um cofre, separado dos backups e da chave do 2FA. Sem ele, as copias externas nao podem ser restauradas.
 
 Teste de restauracao recomendado, ao menos mensalmente:
 
-1. Execute `npm run backup:verify-restore` para testar uma restauracao temporaria e a integridade.
-2. Pare a aplicacao antes de recuperar dados: `docker compose stop app`.
-3. Preserve o arquivo atual: renomeie `inventory.db` para `inventory.db.before-restore`.
-4. Copie o backup escolhido para `inventory.db` no volume `data/`.
-5. Rode `npm run backup:verify-restore <caminho-do-backup>` e inicie `docker compose start app`.
-6. Valide login, contagem de ativos e os ultimos movimentos antes de liberar usuarios.
+1. No servidor, execute `npm run backup:verify-restore` para restaurar a copia local mais recente em uma pasta temporaria e conferir a integridade.
+2. Na maquina que guarda a chave privada, teste a copia externa: `$env:AGE_IDENTITY_FILE="C:\cofre\inventario-backup.key"` e `npm run backup:verify-restore -- \\nas\inventory-backups\inventory-<data>.db.age`. O comando decifra em pasta temporaria, restaura e roda `integrity_check` e `foreign_key_check`. Com a CLI do age, o equivalente e `age -d -i inventario-backup.key inventory-<data>.db.age > inventory-restaurado.db` seguido de `npm run backup:verify-restore -- inventory-restaurado.db`.
+3. Para recuperar dados, pare a aplicacao: `docker compose stop app`.
+4. Preserve o arquivo atual: renomeie `inventory.db` para `inventory.db.before-restore`.
+5. Copie o backup escolhido (decifrado, se vier da copia externa) para `inventory.db` no volume `data/`.
+6. Rode `npm run backup:verify-restore <caminho-do-backup>` e inicie `docker compose start app`.
+7. Valide login, contagem de ativos e os ultimos movimentos antes de liberar usuarios.
 
 ## Recuperacao do administrador
 

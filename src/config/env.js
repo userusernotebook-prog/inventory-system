@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const { loadEnv } = require('./load-env');
 const { resolveTotpEncryptionKey } = require('./totp-key');
+const { backupConfigProblems } = require('./backup-config');
 
 loadEnv();
 const schema = z
@@ -36,6 +37,7 @@ try {
 } catch (error) {
   issues.push(error.message);
 }
+issues.push(...backupConfigProblems(process.env));
 if (issues.length) throw new Error(`Configuração inválida: ${issues.join('; ')}`);
 module.exports = Object.freeze({
   port: result.data.PORT,

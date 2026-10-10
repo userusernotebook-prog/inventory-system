@@ -1,8 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const Database = require('better-sqlite3');
+const { BackupConfigError, backupConfigProblems } = require('../src/config/backup-config');
 
 const root = path.resolve(__dirname, '..');
+const AGE_HEADER = Buffer.from('age-encryption.org/v1\n');
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -20,17 +22,22 @@ function writeBackupStatus(backupDirectory, status) {
   fs.renameSync(temporaryFile, file);
 }
 
-function errorCode(error) {
-  if (error && error.code === 'DATABASE_NOT_FOUND') return error.code;
-  if (error && error.code === 'MONITORING_PING_FAILED') return error.code;
-  if (error && error.code === 'EXTERNAL_ENCRYPTION_NOT_CONFIGURED') return error.code;
-  return 'BACKUP_FAILED';
+function readBackupStatus(backupDirectory) {
+  try {
+    return JSON.parse(fs.readFileSync(backupStatusPath(backupDirectory), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function codedError(code, message, cause) {
+  const error = new Error(message, cause ? { cause } : undefined);
+  error.code = code;
+  return error;
 }
 
 function createDatabaseNotFoundError(databasePath) {
-  const error = new Error(`Banco ainda nao existe: ${databasePath}`);
-  error.code = 'DATABASE_NOT_FOUND';
-  return error;
+  return codedError('DATABASE_NOT_FOUND', `Banco ainda nao existe: ${databasePath}`);
 }
 
 async function waitForDatabase({
@@ -61,6 +68,24 @@ function verifyDatabase(file) {
   }
 }
 
+// O servidor não tem a chave privada, então confere o que é possível sem ela:
+// o arquivo existe, não está vazio e começa com o cabeçalho do formato age.
+function verifyAgeFile(file) {
+  const sizeBytes = fs.statSync(file).size;
+  if (sizeBytes === 0) throw new Error('A cópia cifrada está vazia.');
+  const header = Buffer.alloc(AGE_HEADER.length);
+  const descriptor = fs.openSync(file, 'r');
+  try {
+    fs.readSync(descriptor, header, 0, header.length, 0);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  if (sizeBytes <= AGE_HEADER.length || !header.equals(AGE_HEADER)) {
+    throw new Error('A cópia externa não tem um cabeçalho age válido.');
+  }
+  return { sizeBytes };
+}
+
 function removeExpiredBackups(directory, retentionDays, now = Date.now()) {
   const oldest = now - retentionDays * 24 * 60 * 60 * 1000;
   let removed = 0;
@@ -79,35 +104,64 @@ function removeExpiredBackups(directory, retentionDays, now = Date.now()) {
 
 async function encryptExternalCopy(sourceFile, externalDirectory, recipient) {
   if (!recipient) {
-    const error = new Error('AGE_RECIPIENT e obrigatorio quando BACKUP_EXTERNAL_DIR estiver definido.');
-    error.code = 'EXTERNAL_ENCRYPTION_NOT_CONFIGURED';
-    throw error;
+    throw codedError(
+      'EXTERNAL_ENCRYPTION_NOT_CONFIGURED',
+      'AGE_RECIPIENT e obrigatorio quando BACKUP_EXTERNAL_DIR estiver definido.'
+    );
   }
-  const age = await import('age-encryption');
-  fs.mkdirSync(externalDirectory, { recursive: true });
   const destination = path.join(externalDirectory, `${path.basename(sourceFile)}.age`);
-  const encrypter = new age.Encrypter();
-  encrypter.addRecipient(recipient);
-  const encrypted = await encrypter.encrypt(fs.readFileSync(sourceFile));
-  fs.writeFileSync(destination, encrypted, { flag: 'wx', mode: 0o600 });
-  return destination;
+  const partial = `${destination}.partial`;
+  try {
+    const age = await import('age-encryption');
+    fs.mkdirSync(externalDirectory, { recursive: true });
+    const encrypter = new age.Encrypter();
+    encrypter.addRecipient(recipient);
+    const encrypted = await encrypter.encrypt(fs.readFileSync(sourceFile));
+    fs.writeFileSync(partial, encrypted, { flag: 'wx', mode: 0o600 });
+    fs.renameSync(partial, destination);
+  } catch (error) {
+    fs.rmSync(partial, { force: true });
+    throw codedError(
+      'EXTERNAL_COPY_FAILED',
+      `Falha ao gravar a cópia externa: ${error.message}`,
+      error
+    );
+  }
+  try {
+    return { destination, ...verifyAgeFile(destination) };
+  } catch (error) {
+    throw codedError('EXTERNAL_COPY_INVALID', error.message, error);
+  }
 }
 
 async function sendMonitoringPing(monitorUrl, fetchImpl = global.fetch) {
-  if (!monitorUrl) return;
   if (typeof fetchImpl !== 'function') {
-    const error = new Error('Fetch nao esta disponivel para enviar o ping de monitoramento.');
-    error.code = 'MONITORING_PING_FAILED';
-    throw error;
+    throw codedError(
+      'MONITORING_PING_FAILED',
+      'Fetch nao esta disponivel para enviar o ping de monitoramento.'
+    );
   }
-  const response = await fetchImpl(monitorUrl, { method: 'GET', redirect: 'error' });
+  let response;
+  try {
+    response = await fetchImpl(monitorUrl, { method: 'GET', redirect: 'error' });
+  } catch (error) {
+    throw codedError('MONITORING_PING_FAILED', 'O ping de monitoramento falhou.', error);
+  }
   if (!response.ok) {
-    const error = new Error(`O ping de monitoramento falhou com HTTP ${response.status}.`);
-    error.code = 'MONITORING_PING_FAILED';
-    throw error;
+    throw codedError(
+      'MONITORING_PING_FAILED',
+      `O ping de monitoramento falhou com HTTP ${response.status}.`
+    );
   }
 }
 
+function failure(error, fallbackCode) {
+  return { ok: false, errorCode: error?.code || fallbackCode, message: error?.message };
+}
+
+// Etapas independentes: a cópia local só é descartada se ela mesma falhar
+// antes de ser validada. Falhas na retenção, na cópia externa, na
+// criptografia ou no monitoramento ficam registradas na própria etapa.
 async function createBackup({
   databasePath = process.env.DATABASE_PATH || path.join(root, 'data', 'inventory.db'),
   backupDirectory = process.env.BACKUP_DIR || path.join(root, 'data', 'backups'),
@@ -119,16 +173,43 @@ async function createBackup({
   now = new Date()
 } = {}) {
   if (!Number.isInteger(retentionDays) || retentionDays < 1) {
-    throw new Error('BACKUP_RETENTION_DAYS deve ser um inteiro maior ou igual a 1.');
+    throw new BackupConfigError(['BACKUP_RETENTION_DAYS deve ser um inteiro maior ou igual a 1.']);
   }
+  const previous = readBackupStatus(backupDirectory);
+  const steps = {
+    local: { ok: false },
+    retention: { ok: false, skipped: true },
+    external: externalDirectory ? { ok: false } : { ok: true, skipped: true },
+    monitor: monitorUrl ? { ok: false } : { ok: true, skipped: true }
+  };
+  const record = (destination, externalCopy, sizeBytes) => {
+    const failed = Object.values(steps).find((step) => !step.ok && !step.skipped);
+    const success = !failed;
+    const status = {
+      finishedAt: now.toISOString(),
+      success,
+      sizeBytes,
+      destination: destination ? path.basename(destination) : null,
+      externalCopy: externalCopy ? path.basename(externalCopy) : null,
+      errorCode: failed ? failed.errorCode : null,
+      steps
+    };
+    status.lastSuccessful = success
+      ? {
+          finishedAt: status.finishedAt,
+          sizeBytes,
+          destination: status.destination,
+          externalCopy: status.externalCopy
+        }
+      : previous?.lastSuccessful || null;
+    writeBackupStatus(backupDirectory, status);
+    return status;
+  };
+
   if (!fs.existsSync(databasePath)) {
     const error = createDatabaseNotFoundError(databasePath);
-    writeBackupStatus(backupDirectory, {
-      finishedAt: now.toISOString(),
-      success: false,
-      sizeBytes: 0,
-      errorCode: error.code
-    });
+    steps.local = failure(error);
+    record(null, null, 0);
     throw error;
   }
 
@@ -139,35 +220,75 @@ async function createBackup({
   try {
     await source.backup(destination);
     verifyDatabase(destination);
-    const sizeBytes = fs.statSync(destination).size;
-    let externalCopy = null;
-    if (externalDirectory) {
-      externalCopy = await encryptExternalCopy(destination, externalDirectory, ageRecipient);
-      removeExpiredBackups(externalDirectory, retentionDays, now.getTime());
-    }
-    const removed = removeExpiredBackups(backupDirectory, retentionDays, now.getTime());
-    await sendMonitoringPing(monitorUrl, fetchImpl);
-    const result = { destination, externalCopy, removed, sizeBytes };
-    writeBackupStatus(backupDirectory, {
-      finishedAt: now.toISOString(),
-      success: true,
-      sizeBytes,
-      destination: path.basename(destination),
-      externalCopy: externalCopy ? path.basename(externalCopy) : null
-    });
-    return result;
   } catch (error) {
-    if (fs.existsSync(destination)) fs.unlinkSync(destination);
-    writeBackupStatus(backupDirectory, {
-      finishedAt: now.toISOString(),
-      success: false,
-      sizeBytes: 0,
-      errorCode: errorCode(error)
-    });
+    // Arquivo incompleto ou corrompido: não é uma cópia válida para manter.
+    fs.rmSync(destination, { force: true });
+    steps.local = failure(error, 'LOCAL_BACKUP_FAILED');
+    record(null, null, 0);
     throw error;
   } finally {
     source.close();
   }
+  const sizeBytes = fs.statSync(destination).size;
+  steps.local = {
+    ok: true,
+    file: path.basename(destination),
+    sizeBytes,
+    verifiedAt: new Date().toISOString()
+  };
+
+  let removed = 0;
+  try {
+    removed = removeExpiredBackups(backupDirectory, retentionDays, now.getTime());
+    steps.retention = { ok: true, removed };
+  } catch (error) {
+    steps.retention = failure(error, 'RETENTION_FAILED');
+  }
+
+  let externalCopy = null;
+  if (externalDirectory) {
+    try {
+      const copy = await encryptExternalCopy(destination, externalDirectory, ageRecipient);
+      externalCopy = copy.destination;
+      steps.external = {
+        ok: true,
+        file: path.basename(copy.destination),
+        sizeBytes: copy.sizeBytes,
+        headerVerified: true
+      };
+      try {
+        steps.external.removed = removeExpiredBackups(
+          externalDirectory,
+          retentionDays,
+          now.getTime()
+        );
+      } catch (error) {
+        steps.external.retentionErrorCode = error.code || 'RETENTION_FAILED';
+      }
+    } catch (error) {
+      steps.external = failure(error, 'EXTERNAL_COPY_FAILED');
+    }
+  }
+
+  if (monitorUrl) {
+    const incomplete = Object.entries(steps).some(
+      ([name, step]) => name !== 'monitor' && !step.ok && !step.skipped
+    );
+    if (incomplete) {
+      // O monitor só recebe sinal de sucesso; a ausência dele gera o alerta.
+      steps.monitor = { ok: false, skipped: true, reason: 'backup_incompleto' };
+    } else {
+      try {
+        await sendMonitoringPing(monitorUrl, fetchImpl);
+        steps.monitor = { ok: true };
+      } catch (error) {
+        steps.monitor = failure(error, 'MONITORING_PING_FAILED');
+      }
+    }
+  }
+
+  const status = record(destination, externalCopy, sizeBytes);
+  return { destination, externalCopy, removed, sizeBytes, status };
 }
 
 function latestBackup(directory) {
@@ -182,18 +303,39 @@ function latestBackup(directory) {
 
 if (require.main === module) {
   require('../src/config/load-env').loadEnv();
-  createBackup()
-    .then((result) => console.log(JSON.stringify({ event: 'backup_created', ...result })))
-    .catch((error) => {
-      console.error(JSON.stringify({ event: 'backup_failed', code: errorCode(error) }));
-      process.exitCode = 1;
-    });
+  const problems = backupConfigProblems(process.env);
+  if (problems.length) {
+    console.error(JSON.stringify({ event: 'backup_config_invalid', message: problems.join(' ') }));
+    process.exitCode = 78;
+  } else {
+    createBackup()
+      .then(({ status }) => {
+        console.log(
+          JSON.stringify({
+            event: status.success ? 'backup_created' : 'backup_incomplete',
+            destination: status.destination,
+            externalCopy: status.externalCopy,
+            errorCode: status.errorCode,
+            steps: status.steps
+          })
+        );
+        if (!status.success) process.exitCode = 1;
+      })
+      .catch((error) => {
+        console.error(
+          JSON.stringify({ event: 'backup_failed', code: error.code || 'BACKUP_FAILED' })
+        );
+        process.exitCode = error instanceof BackupConfigError ? 78 : 1;
+      });
+  }
 }
 
 module.exports = {
   createBackup,
   latestBackup,
+  readBackupStatus,
   removeExpiredBackups,
+  verifyAgeFile,
   verifyDatabase,
   waitForDatabase,
   writeBackupStatus

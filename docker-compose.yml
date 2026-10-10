@@ -40,7 +40,10 @@ services:
 
   backup:
     build: .
-    restart: on-failure
+    # Falhas de backup sao repetidas pelo proprio servico com espera crescente.
+    # O processo so encerra com configuracao invalida (codigo 78); nesse caso o
+    # Docker tenta poucas vezes e para, em vez de reiniciar em loop.
+    restart: on-failure:3
     depends_on:
       app:
         condition: service_healthy

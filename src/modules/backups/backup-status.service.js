@@ -8,7 +8,10 @@ function createBackupStatusService({ backupDirectory, fileSystem = fs }) {
       if (!fileSystem.existsSync(statusPath)) return { latestSuccessful: null, lastAttempt: null };
       try {
         const lastAttempt = JSON.parse(fileSystem.readFileSync(statusPath, 'utf8'));
-        return { latestSuccessful: lastAttempt.success ? lastAttempt : null, lastAttempt };
+        // Cada tentativa registra suas etapas; o último backup completo é preservado à parte.
+        const latestSuccessful =
+          lastAttempt.lastSuccessful || (lastAttempt.success ? lastAttempt : null);
+        return { latestSuccessful, lastAttempt };
       } catch {
         return { latestSuccessful: null, lastAttempt: null };
       }
