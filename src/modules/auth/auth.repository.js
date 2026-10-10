@@ -2,6 +2,9 @@ const { likeContains } = require('../../shared/utils/query');
 
 function createAuthRepository(db) {
   return {
+    transaction(work) {
+      return db.transaction(work)();
+    },
     findByEmail(email) {
       return db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE').get(email);
     },
@@ -14,7 +17,7 @@ function createAuthRepository(db) {
           `SELECT u.id,u.name,u.email,u.profile_base,u.active,u.must_change_password,u.totp_enabled,
             s.id AS session_id,s.expires_at
           FROM sessions s JOIN users u ON u.id=s.user_id
-          WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?`
+          WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND u.active=1`
         )
         .get(hash, new Date().toISOString());
     },

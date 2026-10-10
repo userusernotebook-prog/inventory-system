@@ -158,25 +158,36 @@ function createAuthService(repository, auditService) {
         (input.profileBase !== current.profile_base || input.active === false)
       )
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
-      repository.updateUser(id, { ...current, ...input });
-      auditService.logUser(actor, 'update', 'user', id, {
-        before: {
-          name: current.name,
-          email: current.email,
-          profile_base: current.profile_base,
-          active: current.active
-        },
-        after: input,
-        reason: input.reason
+      // R2: desativar ou trocar o perfil encerra as sessões na mesma transação.
+      const revokeSessions =
+        (Boolean(current.active) && input.active === false) ||
+        input.profileBase !== current.profile_base;
+      repository.transaction(() => {
+        repository.updateUser(id, { ...current, ...input });
+        if (revokeSessions) repository.revokeSessions(id);
+        auditService.logUser(actor, 'update', 'user', id, {
+          before: {
+            name: current.name,
+            email: current.email,
+            profile_base: current.profile_base,
+            active: current.active
+          },
+          after: input,
+          reason: input.reason,
+          sessions_revoked: revokeSessions
+        });
       });
       return { ok: true };
     },
     async resetPassword(id, password, actor, reason) {
       const user = repository.findById(id);
       if (!user) throw new ValidationError('Usuário não encontrado.');
-      repository.resetPassword(id, await argon2.hash(password));
-      repository.revokeSessions(id);
-      auditService.logUser(actor, 'reset_password', 'user', id, { reason });
+      const passwordHash = await argon2.hash(password);
+      repository.transaction(() => {
+        repository.resetPassword(id, passwordHash);
+        repository.revokeSessions(id);
+        auditService.logUser(actor, 'reset_password', 'user', id, { reason });
+      });
       return { ok: true };
     },
     async changePassword(user, password) {
@@ -204,22 +215,34 @@ function createAuthService(repository, auditService) {
         throw new ForbiddenError('Use sair para encerrar a própria sessão.');
       }
       if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
-      repository.revokeSessions(id);
-      auditService.logUser(actor, 'force_logout', 'user', id, { reason });
+      repository.transaction(() => {
+        repository.revokeSessions(id);
+        auditService.logUser(actor, 'force_logout', 'user', id, { reason });
+      });
       return { ok: true };
     },
+    // R2: permissões e alcance são lidos a cada requisição; alterá-los também
+    // revoga as sessões, tudo na mesma transação (falha no meio desfaz tudo).
     setOverrides(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
-      repository.setOverrides(id, rows);
-      auditService.logUser(actor, 'permission_override', 'user', id, { after: rows, reason });
+      if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
+      repository.transaction(() => {
+        repository.setOverrides(id, rows);
+        repository.revokeSessions(id);
+        auditService.logUser(actor, 'permission_override', 'user', id, { after: rows, reason });
+      });
       return { ok: true };
     },
     setScopes(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar o próprio alcance.');
-      repository.setScopes(id, rows);
-      auditService.logUser(actor, 'scope', 'user', id, { after: rows, reason });
+      if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
+      repository.transaction(() => {
+        repository.setScopes(id, rows);
+        repository.revokeSessions(id);
+        auditService.logUser(actor, 'scope', 'user', id, { after: rows, reason });
+      });
       return { ok: true };
     },
     listUsers: (options) => pageResult({ ...options, ...repository.listUsers(options) }),
