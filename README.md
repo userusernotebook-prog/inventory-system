@@ -4,20 +4,20 @@ Aplicacao corporativa para cadastro de funcionarios, ativos, chamados, movimenta
 
 ## Instalacao local
 
-Requer Node.js 22 LTS e npm. Instale as dependencias, copie as variaveis de exemplo e inicie:
+Requer Node.js 22 LTS e npm. Instale as dependencias, copie as variaveis de exemplo, preencha a chave do 2FA, crie o administrador e inicie:
 
 ```powershell
 npm ci
 Copy-Item .env.example .env
+# Gere a chave e cole o resultado em TOTP_ENCRYPTION_KEY= no .env:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+npm run create-admin -- "Nome da pessoa" admin@empresa.com
 npm start
 ```
 
-Abra `http://localhost:3000`. O primeiro administrador e criado somente no servidor. Nome e e-mail podem ser passados na linha de comando:
+Abra `http://localhost:3000`. Sem `TOTP_ENCRYPTION_KEY` (ou `TOTP_ENCRYPTION_KEY_FILE`) a aplicacao recusa iniciar com uma mensagem explicita. O primeiro administrador e criado somente no servidor; nome e e-mail podem vir da linha de comando ou de `ADMIN_NAME` e `ADMIN_EMAIL`.
 
-```powershell
-npm run create-admin
-# ou: npm run create-admin -- "Nome da pessoa" admin@empresa.com
-```
+A aplicacao e os scripts `create-admin`, `reset-admin`, `backup` e `backup:verify-restore` leem o `.env` da raiz do projeto. Variaveis ja definidas no ambiente tem precedencia sobre o arquivo.
 
 O comando pede a senha provisoria de forma oculta e pede confirmacao; ela nunca e aceita como argumento. Em automacoes sem terminal, defina `ADMIN_NAME`, `ADMIN_EMAIL` e exatamente uma fonte de senha: `ADMIN_PASSWORD` ou `ADMIN_PASSWORD_FILE`, cujo conteudo e lido localmente. O administrador deve registrar o TOTP no primeiro login. Para desenvolvimento do frontend separado:
 
@@ -27,26 +27,34 @@ npm run web:dev
 
 ## Variaveis de ambiente
 
-| Variavel                      | Uso                                             | Padrao                  |
-| ----------------------------- | ----------------------------------------------- | ----------------------- |
-| `PORT`                        | Porta HTTP da aplicacao                         | `3000`                  |
-| `NODE_ENV`                    | `development`, `test` ou `production`           | `development`           |
-| `APP_ORIGIN`                  | Origem HTTPS publica aceita para cookies e CORS | obrigatoria em producao |
-| `TOTP_ENCRYPTION_KEY`          | Chave AES-256-GCM em base64 para segredos TOTP  | obrigatoria             |
-| `EMPLOYEE_ANONYMIZATION_DAYS` | Dias ate anonimizar funcionarios desligados     | `1825`                  |
-| `DATABASE_PATH`               | Caminho do SQLite para o backup                 | `data/inventory.db`     |
-| `BACKUP_DIR`                  | Diretorio local dos backups                     | `data/backups`          |
-| `BACKUP_EXTERNAL_DIR`         | Montagem externa para segunda copia             | opcional                |
-| `BACKUP_RETENTION_DAYS`       | Retencao dos backups em dias                    | `30`                    |
-| `BACKUP_INTERVAL_SECONDS`     | Intervalo do servico Docker de backup           | `86400`                 |
-| `ADMIN_PASSWORD`              | Senha provisoria apenas para automacao          | sem padrao              |
-| `ADMIN_PASSWORD_FILE`         | Arquivo local com senha para automacao          | sem padrao              |
+Todas estao comentadas no `.env.example`.
+
+| Variavel                          | Uso                                                               | Padrao                     |
+| --------------------------------- | ----------------------------------------------------------------- | -------------------------- |
+| `PORT`                            | Porta HTTP da aplicacao                                           | `3000`                     |
+| `NODE_ENV`                        | `development`, `test` ou `production`                             | `development`              |
+| `APP_ORIGIN`                      | Origem HTTPS publica aceita para cookies e CORS                   | obrigatoria em producao    |
+| `TOTP_ENCRYPTION_KEY`             | Chave AES-256-GCM (32 bytes em base64) para segredos TOTP         | obrigatoria, ou a de baixo |
+| `TOTP_ENCRYPTION_KEY_FILE`        | Arquivo com a chave acima (secret do Docker); nunca junto com ela | sem padrao                 |
+| `TOTP_ENCRYPTION_KEY_SECRET_FILE` | Docker Compose: arquivo do host montado como secret no `app`      | `./secrets/totp_key.txt`   |
+| `EMPLOYEE_ANONYMIZATION_DAYS`     | Dias ate anonimizar funcionarios desligados                       | `1825`                     |
+| `DATABASE_PATH`                   | Caminho do SQLite usado pela aplicacao, scripts e backup          | `data/inventory.db`        |
+| `BACKUP_DIR`                      | Diretorio local dos backups                                       | `data/backups`             |
+| `BACKUP_RETENTION_DAYS`           | Retencao dos backups em dias                                      | `30`                       |
+| `BACKUP_INTERVAL_SECONDS`         | Intervalo do servico Docker de backup (minimo 60)                 | `86400`                    |
+| `BACKUP_EXTERNAL_DIR`             | Destino da segunda copia, cifrada com age; exige `AGE_RECIPIENT`  | opcional                   |
+| `BACKUP_EXTERNAL_HOST_DIR`        | Docker Compose: pasta do host montada como `BACKUP_EXTERNAL_DIR`  | `./external-backups`       |
+| `AGE_RECIPIENT`                   | Chave publica age (`age1...`) que cifra a copia externa           | obrigatoria com externa    |
+| `BACKUP_MONITOR_URL`              | URL chamada (GET) apos backup sem falhas                          | opcional                   |
+| `ADMIN_NAME`, `ADMIN_EMAIL`       | Identidade do admin para `create-admin` e `reset-admin`           | sem padrao                 |
+| `ADMIN_PASSWORD`                  | Senha provisoria apenas para automacao                            | sem padrao                 |
+| `ADMIN_PASSWORD_FILE`             | Arquivo local com senha para automacao                            | sem padrao                 |
 
 `APP_ORIGIN` deve ser a URL final, por exemplo `https://inventario.empresa.com`. Nunca versione `.env`, certificados ou `data/`.
 
 `ADMIN_PASSWORD` e `ADMIN_PASSWORD_FILE` sao usados somente por `create-admin` e `reset-admin`; eles nao devem permanecer em `.env`. Prefira um segredo temporario injetado pelo ambiente ou um arquivo de secret com permissao restrita.
 
-`TOTP_ENCRYPTION_KEY` deve conter 32 bytes aleatorios codificados em base64. Gere-a com `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. No Docker Compose, salve o resultado em `./secrets/totp_key.txt` ou defina `TOTP_ENCRYPTION_KEY_SECRET_FILE` para um arquivo protegido fora do repositório; o Compose o monta somente em `/run/secrets/totp_encryption_key` no serviço `app`. Guarde-a em um cofre de segredos separado dos backups; nunca no banco, no repositório ou na mesma montagem externa de backup. Para rotaciona-la, decifre os segredos com a chave antiga e cifre-os com a nova em uma manutenção controlada, substitua o arquivo do secret e reinicie todos os processos. Se a chave for perdida, use `npm run reset-admin` para reiniciar o 2FA do administrador e recadastre os demais usuarios.
+`TOTP_ENCRYPTION_KEY` deve conter 32 bytes aleatorios codificados em base64. Gere-a com `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Defina a chave por `TOTP_ENCRYPTION_KEY` ou por `TOTP_ENCRYPTION_KEY_FILE`, nunca pelas duas: com as duas definidas a aplicacao recusa iniciar. No Docker Compose, salve o resultado em `./secrets/totp_key.txt` ou defina `TOTP_ENCRYPTION_KEY_SECRET_FILE` para um arquivo protegido fora do repositório; o Compose o monta somente em `/run/secrets/totp_encryption_key` no serviço `app`. Guarde-a em um cofre de segredos separado dos backups; nunca no banco, no repositório ou na mesma montagem externa de backup. Para rotaciona-la, decifre os segredos com a chave antiga e cifre-os com a nova em uma manutenção controlada, substitua o arquivo do secret e reinicie todos os processos. Se a chave for perdida, use `npm run reset-admin` para reiniciar o 2FA do administrador e recadastre os demais usuarios.
 
 ## Arquitetura
 

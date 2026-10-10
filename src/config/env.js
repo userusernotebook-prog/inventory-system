@@ -1,8 +1,8 @@
-const path = require('node:path');
-const dotenv = require('dotenv');
 const { z } = require('zod');
+const { loadEnv } = require('./load-env');
 const { resolveTotpEncryptionKey } = require('./totp-key');
-dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), quiet: true });
+
+loadEnv();
 const schema = z
   .object({
     PORT: z

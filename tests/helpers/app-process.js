@@ -69,10 +69,30 @@ function runNode(cwd, args, environment) {
   return spawnSync(process.execPath, args, { cwd, env: environment, encoding: 'utf8' });
 }
 
-// Executa um script do package.json pelo npm quando o teste roda via npm.
+function npmCli() {
+  const candidates = [
+    process.env.npm_execpath,
+    path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    path.join(
+      path.dirname(process.execPath),
+      '..',
+      'lib',
+      'node_modules',
+      'npm',
+      'bin',
+      'npm-cli.js'
+    )
+  ].filter(Boolean);
+  const found = candidates.find(
+    (candidate) => /npm-cli\.js$/.test(candidate) && fs.existsSync(candidate)
+  );
+  if (!found) throw new Error('npm-cli.js não encontrado para executar npm run.');
+  return found;
+}
+
+// Executa um script do package.json pelo npm, como o README orienta.
 function runNpmScript(cwd, script, args, environment) {
-  const npm = process.env.npm_execpath;
-  if (!npm) throw new Error('Execute os testes com npm test para usar npm run.');
+  const npm = npmCli();
   const extra = args.length ? ['--', ...args] : [];
   return spawnSync(process.execPath, [npm, 'run', '--silent', script, ...extra], {
     cwd,
@@ -81,9 +101,26 @@ function runNpmScript(cwd, script, args, environment) {
   });
 }
 
-async function startServer(cwd, environment, command = ['server.js']) {
-  const port = Number(environment.PORT);
-  const child = spawn(process.execPath, command, { cwd, env: environment });
+// Encerra o processo e seus filhos: `npm start` roda o servidor em um subprocesso.
+function killTree(child) {
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    process.kill(-child.pid, 'SIGTERM');
+  }
+}
+
+async function startServer(
+  cwd,
+  environment,
+  { port = Number(environment.PORT), npmStart = false } = {}
+) {
+  const command = npmStart ? [npmCli(), 'start'] : ['server.js'];
+  const child = spawn(process.execPath, command, {
+    cwd,
+    env: environment,
+    detached: process.platform !== 'win32'
+  });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));
   child.stderr.on('data', (chunk) => (output += chunk));
@@ -105,7 +142,7 @@ async function startServer(cwd, environment, command = ['server.js']) {
     baseUrl: `http://127.0.0.1:${port}`,
     output: () => output,
     async stop() {
-      if (child.exitCode === null) child.kill();
+      if (child.exitCode === null) killTree(child);
       await exited;
     }
   };

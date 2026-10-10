@@ -181,6 +181,7 @@ function latestBackup(directory) {
 }
 
 if (require.main === module) {
+  require('../src/config/load-env').loadEnv();
   createBackup()
     .then((result) => console.log(JSON.stringify({ event: 'backup_created', ...result })))
     .catch((error) => {

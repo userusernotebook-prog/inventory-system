@@ -35,6 +35,7 @@ async function main({ args = process.argv.slice(2), environment = process.env } 
 }
 
 if (require.main === module) {
+  require('../src/config/load-env').loadEnv();
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

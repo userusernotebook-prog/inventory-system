@@ -22,6 +22,7 @@ async function verifyRestore(backupPath) {
 }
 
 if (require.main === module) {
+  require('../src/config/load-env').loadEnv();
   const backupPath =
     process.argv[2] ||
     latestBackup(process.env.BACKUP_DIR || path.join(__dirname, '..', 'data', 'backups'));

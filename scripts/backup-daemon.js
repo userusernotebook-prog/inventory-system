@@ -24,6 +24,7 @@ async function run() {
 }
 
 if (require.main === module) {
+  require('../src/config/load-env').loadEnv();
   run().catch((error) => {
     console.error(JSON.stringify({ event: 'backup_daemon_failed', code: error.code || 'BACKUP_FAILED' }));
     process.exitCode = 1;
