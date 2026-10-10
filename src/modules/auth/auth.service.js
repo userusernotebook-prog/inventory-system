@@ -5,6 +5,7 @@ const { ForbiddenError, UnauthorizedError, ValidationError } = require('../../sh
 const { pageResult } = require('../../shared/utils/query');
 const { decryptTotpSecret, encryptTotpSecret } = require('./totp-crypto');
 const { resolveTotpEncryptionKey } = require('../../config/totp-key');
+const { isAdminOnly, isKnownPermission } = require('./permissions');
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -24,13 +25,44 @@ function readTotpSecret(stored) {
 }
 
 function createAuthService(repository, auditService) {
+  // O admin sempre tem tudo: overrides e alcance gravados para ele são ignorados.
+  // Para os demais, exclusivas do admin e coringas nunca entram, venham de onde vierem.
   function effectivePermissions(user) {
-    const granted = new Set(repository.rolePermissions(user.profile_base));
+    if (user.profile_base === 'ADMIN') return { granted: ['*:*'], denied: [] };
+    const grantable = (permission) => permission !== '*:*' && !isAdminOnly(permission);
+    const granted = new Set(repository.rolePermissions(user.profile_base).filter(grantable));
     const overrides = repository.overrides(user.id);
     const denied = new Set(overrides.filter((x) => x.effect === 'deny').map((x) => x.permission));
-    for (const row of overrides) if (row.effect === 'allow') granted.add(row.permission);
+    for (const row of overrides) {
+      if (row.effect === 'allow' && isKnownPermission(row.permission) && grantable(row.permission))
+        granted.add(row.permission);
+    }
     for (const permission of denied) granted.delete(permission);
     return { granted: [...granted], denied: [...denied] };
+  }
+  function scopesOf(user) {
+    return user.profile_base === 'ADMIN' ? [] : repository.scopes(user.id);
+  }
+  function assertNotOtherUsersAdmin(target, actor) {
+    if (target.profile_base === 'ADMIN' && Number(target.id) !== Number(actor.id)) {
+      throw new ForbiddenError('A conta do administrador só pode ser alterada por ele mesmo.');
+    }
+  }
+  // Ninguém concede o que não possui; exclusivas do admin nunca são concedidas.
+  function assertCanGrant(actor, permission) {
+    if (isAdminOnly(permission)) {
+      throw new ForbiddenError(
+        `${permission} é exclusiva do administrador e não pode ser concedida.`
+      );
+    }
+    if (!can(actor, permission)) {
+      throw new ForbiddenError(`Você não pode conceder ${permission}, que não possui.`);
+    }
+  }
+  function assertCanGrantProfile(actor, profileBase) {
+    for (const permission of repository.rolePermissions(profileBase)) {
+      if (!isAdminOnly(permission)) assertCanGrant(actor, permission);
+    }
   }
   function can(user, permission) {
     const { granted, denied } = effectivePermissions(user);
@@ -43,7 +75,7 @@ function createAuthService(repository, auditService) {
 
   function isInScope(user, resource) {
     const valuesByType = new Map();
-    for (const scope of repository.scopes(user.id)) {
+    for (const scope of scopesOf(user)) {
       const values = valuesByType.get(scope.scope_type) || [];
       values.push(String(scope.scope_value).trim().toLocaleLowerCase('pt-BR'));
       valuesByType.set(scope.scope_type, values);
@@ -117,7 +149,7 @@ function createAuthService(repository, auditService) {
       return effectivePermissions(user);
     },
     scopes(user) {
-      return repository.scopes(user.id);
+      return scopesOf(user);
     },
     assertScope(user, resource) {
       if (!isInScope(user, resource)) {
@@ -132,6 +164,7 @@ function createAuthService(repository, auditService) {
       if (input.profileBase === 'ADMIN') {
         throw new ForbiddenError('O administrador só pode ser criado pelo comando create-admin.');
       }
+      assertCanGrantProfile(actor, input.profileBase);
       const id = repository.createUser({
         name: input.name,
         email: input.email,
@@ -148,6 +181,7 @@ function createAuthService(repository, auditService) {
     updateUser(id, input, actor) {
       const current = repository.findById(id);
       if (!current) throw new ValidationError('Usuário não encontrado.');
+      assertNotOtherUsersAdmin(current, actor);
       if (
         current.profile_base === 'ADMIN' &&
         (input.profileBase !== 'ADMIN' || input.active === false)
@@ -158,6 +192,8 @@ function createAuthService(repository, auditService) {
         (input.profileBase !== current.profile_base || input.active === false)
       )
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
+      if (input.profileBase !== current.profile_base)
+        assertCanGrantProfile(actor, input.profileBase);
       // R2: desativar ou trocar o perfil encerra as sessões na mesma transação.
       const revokeSessions =
         (Boolean(current.active) && input.active === false) ||
@@ -182,6 +218,7 @@ function createAuthService(repository, auditService) {
     async resetPassword(id, password, actor, reason) {
       const user = repository.findById(id);
       if (!user) throw new ValidationError('Usuário não encontrado.');
+      assertNotOtherUsersAdmin(user, actor);
       const passwordHash = await argon2.hash(password);
       repository.transaction(() => {
         repository.resetPassword(id, passwordHash);
@@ -214,7 +251,9 @@ function createAuthService(repository, auditService) {
       if (Number(id) === actor.id) {
         throw new ForbiddenError('Use sair para encerrar a própria sessão.');
       }
-      if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
+      const target = repository.findById(id);
+      if (!target) throw new ValidationError('Usuário não encontrado.');
+      assertNotOtherUsersAdmin(target, actor);
       repository.transaction(() => {
         repository.revokeSessions(id);
         auditService.logUser(actor, 'force_logout', 'user', id, { reason });
@@ -226,7 +265,17 @@ function createAuthService(repository, auditService) {
     setOverrides(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
-      if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
+      const target = repository.findById(id);
+      if (!target) throw new ValidationError('Usuário não encontrado.');
+      if (target.profile_base === 'ADMIN') {
+        throw new ForbiddenError('As permissões do administrador não podem ser alteradas.');
+      }
+      for (const row of rows) {
+        if (!isKnownPermission(row.permission)) {
+          throw new ValidationError(`Permissão desconhecida: ${row.permission}.`);
+        }
+        if (row.effect === 'allow') assertCanGrant(actor, row.permission);
+      }
       repository.transaction(() => {
         repository.setOverrides(id, rows);
         repository.revokeSessions(id);
@@ -237,7 +286,11 @@ function createAuthService(repository, auditService) {
     setScopes(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar o próprio alcance.');
-      if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
+      const target = repository.findById(id);
+      if (!target) throw new ValidationError('Usuário não encontrado.');
+      if (target.profile_base === 'ADMIN') {
+        throw new ForbiddenError('O alcance do administrador não pode ser restringido.');
+      }
       repository.transaction(() => {
         repository.setScopes(id, rows);
         repository.revokeSessions(id);

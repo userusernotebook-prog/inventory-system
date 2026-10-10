@@ -191,6 +191,14 @@ function createApprovalsService(
     return results;
   }
 
+  // R4: somente o ADMIN aprova ou rejeita, mesmo que a permissão apareça de outra forma.
+  function assertAdmin(user) {
+    authService.authorize(user, 'request:approve');
+    if (user.profile_base !== 'ADMIN') {
+      throw new ForbiddenError('Somente o administrador aprova ou rejeita solicitações.');
+    }
+  }
+
   return {
     create(input, user) {
       authService.authorize(user, 'request:create');
@@ -246,7 +254,7 @@ function createApprovalsService(
       return detail;
     },
     approve(id, approver, reason) {
-      authService.authorize(approver, 'request:approve');
+      assertAdmin(approver);
       return db.transaction(() => {
         expireDueRequests();
         const request = getPending(id);
@@ -265,13 +273,17 @@ function createApprovalsService(
           'Sua solicitação foi aprovada e executada.'
         );
         auditService.logUser(approver, 'approval_approved', 'approval_request', id, {
-          after: { auto_approved: autoApproved, reason }
+          after: {
+            auto_approved: autoApproved,
+            ...(autoApproved ? { marca: 'auto-aprovada' } : {}),
+            reason
+          }
         });
         return { ok: true, auto_approved: autoApproved };
       })();
     },
     reject(id, reason, approver) {
-      authService.authorize(approver, 'request:approve');
+      assertAdmin(approver);
       return db.transaction(() => {
         expireDueRequests();
         const request = getPending(id);

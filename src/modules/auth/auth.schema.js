@@ -46,7 +46,8 @@ const totp = z.object({ code: z.string().min(6) });
 const overrides = z.object({
   overrides: z.array(
     z.object({
-      permission: z.string().regex(/^[a-z*]+:[a-z*]+$/),
+      // O service valida contra o catálogo de permissões (aceita hífen e sublinhado).
+      permission: z.string().trim().min(3).max(64),
       effect: z.enum(['allow', 'deny'])
     })
   ),

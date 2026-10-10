@@ -76,7 +76,7 @@ As rotas validam Zod e delegam aos services. Services concentram transacoes e re
 
 ## Perfis e permissoes
 
-As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conceder ou negar permissoes individuais; `deny` sempre vence. Alcances opcionais por cidade, departamento e tipo de equipamento sao aplicados nos services e repositories.
+As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conceder ou negar permissoes individuais do catalogo (`src/modules/auth/permissions.js`); `deny` sempre vence. `user:manage` e `request:approve` sao exclusivas do ADMIN e nunca sao concedidas por permissao individual; coringas e nomes desconhecidos sao recusados, e ninguem concede uma permissao que nao possui. Nenhuma acao sobre a conta do admin (senha, dados, perfil, permissoes, alcance, 2FA ou sessoes) e aceita de outro usuario, e e impossivel negar permissoes ou restringir o alcance do admin. Alcances opcionais por cidade, departamento e tipo de equipamento sao aplicados nos services e repositories.
 
 | Perfil       | Acesso padrao                                                                 |
 | ------------ | ----------------------------------------------------------------------------- |
@@ -96,7 +96,7 @@ Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra
 
 1. Um usuario com `request:create` abre uma solicitacao com justificativa e ativos.
 2. O ativo fica reservado enquanto a solicitacao estiver `PENDENTE`: qualquer mudanca de estado por outra rota (`/move`, desligamento, destino) e recusada com 409 "Ativo reservado pela solicitacao #N". So a execucao da propria solicitacao move o ativo; rejeicao, cancelamento ou expiracao liberam a reserva.
-3. Somente `request:approve` aprova ou rejeita. O administrador pode autoaprovar, e isso e auditado.
+3. Somente o ADMIN aprova ou rejeita; ninguem mais aprova, nem a propria solicitacao nem a de outro. O administrador pode autoaprovar, e a auditoria registra a marca "auto-aprovada".
 4. A aprovacao revalida o estado e executa a movimentacao na mesma transacao.
 5. Troca movimenta o ativo antigo para avaliacao e atribui o novo. Na criacao e na aprovacao, o ativo antigo precisa estar `EM_USO` e atribuido exatamente ao funcionario da solicitacao; o novo pode estar em `DISPONIVEL` ou `BACKUP` (neste caso, a aprovacao da propria troca atende a regra de backup); backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.
 
