@@ -4,7 +4,7 @@ const {
   NotFoundError,
   ValidationError
 } = require('../../shared/errors');
-const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
+const { ASSET_STATES, getTransition } = require('../assets/domain/asset-state-machine');
 const { pageResult } = require('../../shared/utils/query');
 
 const TYPES = Object.freeze({
@@ -88,6 +88,13 @@ function createApprovalsService(
       const asset = assetsRepository.findById(input.asset_id);
       if (!asset || asset.status === ASSET_STATES.DEACTIVATED)
         throw new ValidationError('Ativo não pode ser desativado.');
+      // A máquina de estados decide de onde a desativação parte (ex.: devolução
+      // pendente precisa ser recebida e avaliada antes).
+      try {
+        getTransition(asset.status, ASSET_STATES.DEACTIVATED);
+      } catch {
+        throw new ValidationError(`Ativo em ${asset.status} não pode ser desativado neste estado.`);
+      }
       authService.assertScope(user, asset);
       return [{ assetId: input.asset_id, role: 'PRIMARY', expectedStatus: asset.status }];
     }

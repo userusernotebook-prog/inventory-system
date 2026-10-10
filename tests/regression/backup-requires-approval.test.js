@@ -50,10 +50,19 @@ test('grafo: DISPONIVEL só existe na criação e só ele vai a EM_USO sem aprov
 
   for (const state of [UNDER_MAINTENANCE, UNDER_EVALUATION, RETURN_PENDING]) {
     const targets = TRANSITIONS[state].filter((rule) => !rule.requiresApproval).map((r) => r.to);
-    assert.ok(targets.includes(BACKUP), `${state} precisa voltar para BACKUP`);
     assert.ok(!targets.includes(AVAILABLE), `${state} não pode voltar para DISPONIVEL`);
     assert.ok(!targets.includes(IN_USE), `${state} não pode ir direto para EM_USO`);
   }
+  for (const state of [UNDER_MAINTENANCE, UNDER_EVALUATION]) {
+    const targets = TRANSITIONS[state].filter((rule) => !rule.requiresApproval).map((r) => r.to);
+    assert.ok(targets.includes(BACKUP), `${state} precisa voltar para BACKUP`);
+  }
+  // Rodada 2: a devolução passa obrigatoriamente pelo recebimento (EM_AVALIACAO)
+  // e de lá segue para BACKUP.
+  assert.deepEqual(
+    TRANSITIONS[RETURN_PENDING].map((rule) => rule.to),
+    [UNDER_EVALUATION]
+  );
 });
 
 async function scenario(t) {
@@ -237,7 +246,7 @@ test('desligamento: ativo devolvido não é reatribuído nem liberado sem aprova
 
   const received = await s.technicianSession
     .post(`/api/offboarding/assets/${laptop}/receive`)
-    .send({ physical_condition: 'Bom estado' });
+    .send({ physical_condition: 'Bom estado', accessories: 'Carregador' });
   assert.equal(received.status, 200, JSON.stringify(received.body));
   const toAvailable = await s.technicianSession
     .post(`/api/offboarding/assets/${laptop}/destination`)

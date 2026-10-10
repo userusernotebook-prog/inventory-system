@@ -7,7 +7,8 @@ const receive = z
   .object({
     received_at: z.string().datetime({ offset: true }).optional(),
     physical_condition: z.string().trim().min(2).max(500),
-    accessories: z.string().trim().max(1000).optional()
+    // Informe os acessórios devolvidos, ou "Nenhum".
+    accessories: z.string().trim().min(1).max(1000)
   })
   .strict();
 const destination = z

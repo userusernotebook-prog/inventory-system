@@ -66,6 +66,25 @@ function createOffboardingRepository(db) {
         )
         .all(employeeId, employeeId);
     },
+    // Ativos que entraram na devolução deste desligamento (ou ainda estão com a
+    // pessoa) e não têm recibo de recebimento.
+    assetsWithoutReceipt(employeeId) {
+      return db
+        .prepare(
+          `SELECT DISTINCT pending.asset_id FROM (
+            SELECT json_extract(e.details,'$.asset_id') asset_id FROM employee_events e
+            WHERE e.employee_id=? AND e.event_type='ATIVO_PENDENTE_DEVOLUCAO'
+            UNION
+            SELECT s.asset_id FROM assignments s WHERE s.employee_id=? AND s.returned_at IS NULL
+          ) pending
+          WHERE NOT EXISTS (
+            SELECT 1 FROM asset_receipts r WHERE r.asset_id=pending.asset_id AND r.employee_id=?
+          )
+          ORDER BY pending.asset_id`
+        )
+        .all(employeeId, employeeId, employeeId)
+        .map((row) => row.asset_id);
+    },
     openTickets(employeeId) {
       return db
         .prepare("SELECT * FROM tickets WHERE employee_id=? AND status IN ('open','in_progress')")

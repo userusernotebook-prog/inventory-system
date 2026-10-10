@@ -34,7 +34,9 @@ function transition(to, movementType, permission, options = {}) {
     movementType,
     permission,
     requiredFields: Object.freeze(options.requiredFields || []),
-    requiresApproval: Boolean(options.requiresApproval)
+    requiresApproval: Boolean(options.requiresApproval),
+    // Transição que só pode ocorrer dentro de um fluxo próprio (ex.: desligamento).
+    flow: options.flow || null
   });
 }
 
@@ -58,6 +60,9 @@ const {
 } = MOVEMENT_TYPES;
 
 const WITH_REASON = { requiredFields: ['reason'] };
+// Devolução do desligamento: marcada só no início do desligamento e encerrada só
+// pelo recebimento, que registra estado físico e acessórios.
+const OFFBOARDING_FLOW = 'offboarding';
 const DEACTIVATION_RULE = {
   requiredFields: ['reason', 'technicalReport'],
   requiresApproval: true
@@ -78,17 +83,19 @@ const TRANSITIONS = Object.freeze({
       requiredFields: ['employeeToId'],
       requiresApproval: true
     }),
-    transition(RETURN_PENDING, MOVEMENT_TYPES.RETURN_PENDING, 'asset:mark-return-pending'),
+    transition(RETURN_PENDING, MOVEMENT_TYPES.RETURN_PENDING, 'asset:mark-return-pending', {
+      flow: OFFBOARDING_FLOW
+    }),
     transition(BACKUP, SEND_TO_BACKUP, 'asset:send-backup'),
     transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
     transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
   ]),
   [RETURN_PENDING]: Object.freeze([
-    transition(BACKUP, SEND_TO_BACKUP, 'asset:send-backup'),
-    transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
-    transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
-    transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
+    transition(UNDER_EVALUATION, EVALUATION, 'asset:receive', {
+      ...WITH_REASON,
+      flow: OFFBOARDING_FLOW
+    })
   ]),
   [BACKUP]: Object.freeze([
     transition(IN_USE, ASSIGNMENT, 'asset:assign', {
@@ -168,6 +175,7 @@ function validateTransition(input) {
 module.exports = {
   ASSET_STATES,
   MOVEMENT_TYPES,
+  OFFBOARDING_FLOW,
   TRANSITIONS,
   AssetStateTransitionError,
   getTransition,

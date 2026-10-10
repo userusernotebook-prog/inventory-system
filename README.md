@@ -105,9 +105,9 @@ Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra
 ## Fluxo de desligamento
 
 1. RH/admin com `employee:offboard` inicia com data e motivo. O funcionario vira `em_desligamento` e os ativos vao para `PENDENTE_DEVOLUCAO` na mesma transacao.
-2. Tecnico com `asset:receive` recebe cada item, registrando estado fisico e acessorios; ele vai para `EM_AVALIACAO`.
+2. Tecnico com `asset:receive` recebe cada item pelo endpoint de recebimento, que exige estado fisico e acessorios (ou "Nenhum"); ele vai para `EM_AVALIACAO`. `PENDENTE_DEVOLUCAO` so e marcado no inicio do desligamento e so sai pelo recebimento: o `/move` nao pula etapas nem leva o ativo direto a `BACKUP`, `EM_MANUTENCAO` ou `DESATIVADO`.
 3. Tecnico define `BACKUP`, `EM_MANUTENCAO` ou propoe `DESATIVADO`. A ultima opcao abre aprovacao com laudo obrigatorio.
-4. RH/admin conclui somente sem ativos pendentes, sem desativacao aberta e depois de fechar ou reatribuir chamados abertos.
+4. RH/admin conclui somente sem ativos pendentes, com registro de recebimento de todos os ativos devolvidos, sem desativacao aberta e depois de fechar ou reatribuir chamados abertos.
 
 `employee_events`, `movements` e auditoria preservam o historico. Movimentacoes sao imutaveis no banco.
 

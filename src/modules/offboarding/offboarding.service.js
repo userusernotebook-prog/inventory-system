@@ -1,5 +1,5 @@
 const { NotFoundError, ValidationError } = require('../../shared/errors');
-const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
+const { ASSET_STATES, OFFBOARDING_FLOW } = require('../assets/domain/asset-state-machine');
 
 function createOffboardingService(
   db,
@@ -31,7 +31,8 @@ function createOffboardingService(
           movementsService.performMove(
             asset.id,
             { toStatus: ASSET_STATES.RETURN_PENDING, reason: input.reason },
-            user
+            user,
+            { flow: OFFBOARDING_FLOW }
           );
           repository.event(employee.id, 'ATIVO_PENDENTE_DEVOLUCAO', user.id, {
             asset_id: asset.id
@@ -63,7 +64,8 @@ function createOffboardingService(
         const result = movementsService.performMove(
           assetId,
           { toStatus: ASSET_STATES.UNDER_EVALUATION, reason: 'Recebimento no desligamento' },
-          user
+          user,
+          { flow: OFFBOARDING_FLOW }
         );
         repository.addReceipt({
           assetId,
@@ -141,6 +143,12 @@ function createOffboardingService(
           (checklist[ASSET_STATES.UNDER_EVALUATION] || 0);
         if (pending)
           throw new ValidationError('Ainda há ativos pendentes de recebimento ou avaliação.');
+        const withoutReceipt = repository.assetsWithoutReceipt(employee.id);
+        if (withoutReceipt.length) {
+          throw new ValidationError(
+            `Ativos sem registro de recebimento: ${withoutReceipt.map((id) => `#${id}`).join(', ')}.`
+          );
+        }
         const openTickets = repository.openTickets(employee.id);
         const actions = new Map(
           (input.ticket_actions || []).map((action) => [action.ticket_id, action])

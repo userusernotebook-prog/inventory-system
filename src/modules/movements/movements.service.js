@@ -63,6 +63,11 @@ function createMovementsService(
     } catch (error) {
       throwAsValidationError(error);
     }
+    if (rule.flow && options.flow !== rule.flow) {
+      throw new ValidationError(
+        'Esta etapa só ocorre pelo fluxo de desligamento: a devolução é marcada no início e encerrada pelo recebimento, com estado físico e acessórios.'
+      );
+    }
     authService.authorize(user, rule.permission);
     if (rule.requiresApproval && !options.approvedRequestId) {
       throw new ValidationError(
