@@ -49,7 +49,6 @@ const {
 } = ASSET_STATES;
 const {
   ASSIGNMENT,
-  RETURN,
   TRANSFER,
   SEND_TO_MAINTENANCE,
   RETURN_FROM_MAINTENANCE,
@@ -72,12 +71,13 @@ const TRANSITIONS = Object.freeze({
     transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
   ]),
+  // Regra R1: DISPONIVEL é só estoque novo. Equipamento devolvido, avaliado ou
+  // reparado volta para BACKUP, e de BACKUP só sai para EM_USO com aprovação.
   [IN_USE]: Object.freeze([
     transition(IN_USE, TRANSFER, 'asset:transfer', {
       requiredFields: ['employeeToId'],
       requiresApproval: true
     }),
-    transition(AVAILABLE, RETURN, 'asset:receive'),
     transition(RETURN_PENDING, MOVEMENT_TYPES.RETURN_PENDING, 'asset:mark-return-pending'),
     transition(BACKUP, SEND_TO_BACKUP, 'asset:send-backup'),
     transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
@@ -85,8 +85,6 @@ const TRANSITIONS = Object.freeze({
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
   ]),
   [RETURN_PENDING]: Object.freeze([
-    transition(IN_USE, ASSIGNMENT, 'asset:assign', { requiredFields: ['employeeToId'] }),
-    transition(AVAILABLE, RETURN, 'asset:receive'),
     transition(BACKUP, SEND_TO_BACKUP, 'asset:send-backup'),
     transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
     transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
@@ -97,19 +95,16 @@ const TRANSITIONS = Object.freeze({
       requiredFields: ['employeeToId'],
       requiresApproval: true
     }),
-    transition(AVAILABLE, RETURN, 'asset:receive'),
     transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
     transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
   ]),
   [UNDER_MAINTENANCE]: Object.freeze([
-    transition(AVAILABLE, RETURN_FROM_MAINTENANCE, 'asset:return-maintenance'),
     transition(BACKUP, RETURN_FROM_MAINTENANCE, 'asset:return-maintenance'),
     transition(UNDER_EVALUATION, EVALUATION, 'asset:evaluate', WITH_REASON),
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)
   ]),
   [UNDER_EVALUATION]: Object.freeze([
-    transition(AVAILABLE, RETURN_FROM_MAINTENANCE, 'asset:return-evaluation'),
     transition(BACKUP, SEND_TO_BACKUP, 'asset:send-backup'),
     transition(UNDER_MAINTENANCE, SEND_TO_MAINTENANCE, 'asset:send-maintenance', WITH_REASON),
     transition(DEACTIVATED, DEACTIVATION, 'asset:deactivate', DEACTIVATION_RULE)

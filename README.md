@@ -97,7 +97,8 @@ Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra
 3. Somente `request:approve` aprova ou rejeita. O administrador pode autoaprovar, e isso e auditado.
 4. A aprovacao revalida o estado e executa a movimentacao na mesma transacao.
 5. Troca movimenta o ativo antigo para avaliacao e atribui o novo; backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.
-6. Eventos de criacao, decisao, execucao, cancelamento e expiracao sao imutaveis.
+
+`DISPONIVEL` e somente estoque novo, nunca usado: o ativo so entra nesse estado no cadastro, e atribuir um ativo `DISPONIVEL` nao exige aprovacao. Equipamento devolvido, avaliado ou reparado volta para `BACKUP`, nunca para `DISPONIVEL`. De `BACKUP` para `EM_USO` nao ha atalho: nem por `/move` em dois passos, nem por importacao, troca ou desligamento; o unico caminho e uma solicitacao aprovada. A migration 013 move para `BACKUP` os ativos ja usados que estavam em `DISPONIVEL` pela regra antiga. 6. Eventos de criacao, decisao, execucao, cancelamento e expiracao sao imutaveis.
 
 ## Fluxo de desligamento
 
