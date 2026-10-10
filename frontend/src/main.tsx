@@ -7,6 +7,7 @@ import { canUser } from './lib/permissions';
 import { api } from './lib/api';
 import { AssetsPage, AssetDetailPage, EmployeeDetailPage, EmployeesPage } from './pages/InventoryPages';
 import { LoginPage, OnboardingPage } from './pages/LoginPage';
+import { NewUserPage, UserDetailPage, UsersPage } from './pages/UsersPages';
 import { ErrorState, Loading } from './components/Feedback';
 import './styles.css';
 
@@ -39,10 +40,10 @@ function OnboardingRoute() { const { user, loading } = useAuth(); if (loading) r
 
 function Shell() {
   const { user, logout } = useAuth();
-  const items = [{ to: '/', label: 'Dashboard', permission: 'asset:read' }, { to: '/employees', label: 'Funcionarios', permission: 'employee:read' }, { to: '/assets', label: 'Ativos', permission: 'asset:read' }];
+  const items = [{ to: '/', label: 'Dashboard', permission: 'asset:read' }, { to: '/employees', label: 'Funcionarios', permission: 'employee:read' }, { to: '/assets', label: 'Ativos', permission: 'asset:read' }, { to: '/users', label: 'Usuarios', permission: 'user:manage' }];
   return <div className="min-h-screen md:grid md:grid-cols-[15rem_1fr]"><aside className="bg-brand-950 p-4 text-white"><p className="mb-8 text-lg font-bold">Gestao de Ativos</p><nav className="grid gap-1" aria-label="Menu principal">{items.filter((item) => canUser(user, item.permission)).map((item) => <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/10" key={item.to} to={item.to}>{item.label}</Link>)}</nav><div className="mt-10 border-t border-white/15 pt-4 text-sm"><p className="font-semibold">{user?.name}</p><p className="text-white/65">{user?.profile_base}</p><button className="mt-3 text-white/80 underline" onClick={() => logout()}>Sair</button></div></aside><main className="p-5 md:p-8"><Outlet /></main></div>;
 }
 
-function AppRoutes() { return <Routes><Route path="/login" element={<LoginRoute />} /><Route path="/onboarding" element={<OnboardingRoute />} /><Route path="/forbidden" element={<RequireAuth />}><Route index element={<ForbiddenPage />} /></Route><Route element={<RequireAuth />}><Route element={<Shell />}><Route element={<RequirePermission permission="asset:read" />}><Route index element={<Dashboard />} /><Route path="assets" element={<AssetsPage />} /><Route path="assets/:id" element={<AssetDetailPage />} /></Route><Route element={<RequirePermission permission="employee:read" />}><Route path="employees" element={<EmployeesPage />} /><Route path="employees/:id" element={<EmployeeDetailPage />} /></Route><Route path="*" element={<NotFoundPage />} /></Route></Route></Routes>; }
+function AppRoutes() { return <Routes><Route path="/login" element={<LoginRoute />} /><Route path="/onboarding" element={<OnboardingRoute />} /><Route path="/forbidden" element={<RequireAuth />}><Route index element={<ForbiddenPage />} /></Route><Route element={<RequireAuth />}><Route element={<Shell />}><Route element={<RequirePermission permission="asset:read" />}><Route index element={<Dashboard />} /><Route path="assets" element={<AssetsPage />} /><Route path="assets/:id" element={<AssetDetailPage />} /></Route><Route element={<RequirePermission permission="employee:read" />}><Route path="employees" element={<EmployeesPage />} /><Route path="employees/:id" element={<EmployeeDetailPage />} /></Route><Route element={<RequirePermission permission="user:manage" />}><Route path="users" element={<UsersPage />} /><Route path="users/new" element={<NewUserPage />} /><Route path="users/:id" element={<UserDetailPage />} /></Route><Route path="*" element={<NotFoundPage />} /></Route></Route></Routes>; }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><QueryClientProvider client={queryClient}><HashRouter><AuthProvider><AppRoutes /></AuthProvider></HashRouter></QueryClientProvider></StrictMode>);

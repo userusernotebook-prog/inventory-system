@@ -10,6 +10,16 @@ export type User = {
   permissions: PermissionState;
   scopes: Scope[];
 };
+export type ManagedUser = {
+  id: number;
+  name: string;
+  email: string;
+  profile_base: string;
+  active: boolean;
+  last_login_at?: string | null;
+  must_change_password: boolean;
+  totp_enabled: boolean;
+};
 export type Page<T> = {
   items: T[];
   page: number;

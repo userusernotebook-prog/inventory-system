@@ -48,6 +48,13 @@ function createAuthRoutes(service) {
   );
   router.get('/api/users', ...manage, validate(schema.userList, 'query'), controller.listUsers);
   router.post('/api/users', ...manage, validate(schema.user, 'body'), controller.createUser);
+  router.get('/api/users/scope-options', ...manage, controller.scopeOptions);
+  router.get(
+    '/api/users/:id',
+    ...manage,
+    validate(schema.id, 'params'),
+    controller.userAdministration
+  );
   router.put(
     '/api/users/:id',
     ...manage,
@@ -66,6 +73,7 @@ function createAuthRoutes(service) {
     '/api/users/:id/force-logout',
     ...manage,
     validate(schema.id, 'params'),
+    validate(schema.reason, 'body'),
     controller.forceLogout
   );
   router.put(

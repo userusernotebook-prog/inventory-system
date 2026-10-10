@@ -141,10 +141,16 @@ function buildOpenApi() {
         post: operation('user:manage', 'Cria usuário')
       },
       '/api/users/{id}': {
+        get: operation('user:manage', 'Consulta configuracao administrativa do usuario', {
+          parameters: identifier
+        }),
         put: operation('user:manage', 'Atualiza usuário', { parameters: identifier })
       },
       '/api/users/{id}/reset-password': {
         post: operation('user:manage', 'Redefine senha', { parameters: identifier })
+      },
+      '/api/users/scope-options': {
+        get: operation('user:manage', 'Lista opcoes de alcance para usuarios')
       },
       '/api/users/{id}/force-logout': {
         post: operation('user:manage', 'Encerra sessões', { parameters: identifier })

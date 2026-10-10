@@ -61,6 +61,23 @@ function createAuthRepository(db) {
     scopes(id) {
       return db.prepare('SELECT scope_type,scope_value FROM user_scopes WHERE user_id=?').all(id);
     },
+    scopeOptions() {
+      const values = (statement) =>
+        db
+          .prepare(statement)
+          .all()
+          .map((row) => row.value)
+          .filter(Boolean);
+      return {
+        cities: values("SELECT DISTINCT trim(city) AS value FROM employees WHERE trim(coalesce(city,''))<>'' ORDER BY value"),
+        departments: values(
+          "SELECT DISTINCT trim(department) AS value FROM employees WHERE trim(coalesce(department,''))<>'' ORDER BY value"
+        ),
+        equipmentTypes: values(
+          "SELECT DISTINCT trim(equipment_type) AS value FROM assets WHERE trim(coalesce(equipment_type,''))<>'' ORDER BY value"
+        )
+      };
+    },
     countAdmins() {
       return db.prepare("SELECT COUNT(*) n FROM users WHERE profile_base='ADMIN'").get().n;
     },

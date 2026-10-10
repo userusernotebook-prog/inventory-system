@@ -52,22 +52,45 @@ function createAuthController(service) {
     },
     async resetPassword(req, res) {
       res.json(
-        await service.resetPassword(req.validated.params.id, req.validated.body.password, req.user)
+        await service.resetPassword(
+          req.validated.params.id,
+          req.validated.body.password,
+          req.user,
+          req.validated.body.reason
+        )
       );
     },
     forceLogout(req, res) {
-      res.json(service.forceLogout(req.validated.params.id, req.user));
+      res.json(service.forceLogout(req.validated.params.id, req.user, req.validated.body.reason));
     },
     setOverrides(req, res) {
       res.json(
-        service.setOverrides(req.validated.params.id, req.validated.body.overrides, req.user)
+        service.setOverrides(
+          req.validated.params.id,
+          req.validated.body.overrides,
+          req.user,
+          req.validated.body.reason
+        )
       );
     },
     setScopes(req, res) {
-      res.json(service.setScopes(req.validated.params.id, req.validated.body.scopes, req.user));
+      res.json(
+        service.setScopes(
+          req.validated.params.id,
+          req.validated.body.scopes,
+          req.user,
+          req.validated.body.reason
+        )
+      );
     },
     permissions(req, res) {
       res.json(service.effectivePermissions(service.findUser(req.validated.params.id)));
+    },
+    userAdministration(req, res) {
+      res.json(service.userAdministration(req.validated.params.id));
+    },
+    scopeOptions(_req, res) {
+      res.json(service.scopeOptions());
     }
   };
 }

@@ -158,16 +158,17 @@ function createAuthService(repository, auditService) {
           profile_base: current.profile_base,
           active: current.active
         },
-        after: input
+        after: input,
+        reason: input.reason
       });
       return { ok: true };
     },
-    async resetPassword(id, password, actor) {
+    async resetPassword(id, password, actor, reason) {
       const user = repository.findById(id);
       if (!user) throw new ValidationError('Usuário não encontrado.');
       repository.resetPassword(id, await argon2.hash(password));
       repository.revokeSessions(id);
-      auditService.logUser(actor, 'reset_password', 'user', id, {});
+      auditService.logUser(actor, 'reset_password', 'user', id, { reason });
       return { ok: true };
     },
     async changePassword(user, password) {
@@ -195,31 +196,52 @@ function createAuthService(repository, auditService) {
       repository.revokeSession(user.session_id);
       return { ok: true };
     },
-    forceLogout(id, actor) {
+    forceLogout(id, actor, reason) {
       if (Number(id) === actor.id) {
         throw new ForbiddenError('Use sair para encerrar a própria sessão.');
       }
       if (!repository.findById(id)) throw new ValidationError('Usuário não encontrado.');
       repository.revokeSessions(id);
-      auditService.logUser(actor, 'force_logout', 'user', id, {});
+      auditService.logUser(actor, 'force_logout', 'user', id, { reason });
       return { ok: true };
     },
-    setOverrides(id, rows, actor) {
+    setOverrides(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar os próprios privilégios.');
       repository.setOverrides(id, rows);
-      auditService.logUser(actor, 'permission_override', 'user', id, { after: rows });
+      auditService.logUser(actor, 'permission_override', 'user', id, { after: rows, reason });
       return { ok: true };
     },
-    setScopes(id, rows, actor) {
+    setScopes(id, rows, actor, reason) {
       if (Number(id) === actor.id)
         throw new ForbiddenError('Você não pode alterar o próprio alcance.');
       repository.setScopes(id, rows);
-      auditService.logUser(actor, 'scope', 'user', id, { after: rows });
+      auditService.logUser(actor, 'scope', 'user', id, { after: rows, reason });
       return { ok: true };
     },
     listUsers: (options) => pageResult({ ...options, ...repository.listUsers(options) }),
-    findUser: (id) => repository.findById(id)
+    findUser: (id) => repository.findById(id),
+    userAdministration(id) {
+      const user = repository.findById(id);
+      if (!user) throw new ValidationError('UsuÃ¡rio nÃ£o encontrado.');
+      return {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          profile_base: user.profile_base,
+          active: Boolean(user.active),
+          last_login_at: user.last_login_at,
+          must_change_password: Boolean(user.must_change_password),
+          totp_enabled: Boolean(user.totp_enabled)
+        },
+        profilePermissions: repository.rolePermissions(user.profile_base),
+        overrides: repository.overrides(user.id),
+        scopes: repository.scopes(user.id),
+        effectivePermissions: effectivePermissions(user)
+      };
+    },
+    scopeOptions: () => repository.scopeOptions()
   };
 }
 module.exports = { createAuthService };

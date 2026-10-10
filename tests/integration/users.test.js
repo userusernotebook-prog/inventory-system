@@ -46,6 +46,11 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       list.body.items.some((user) => user.id === userId),
       true
     );
+    const scopeOptions = await context.agent.get('/api/users/scope-options');
+    assert.equal(scopeOptions.status, 200, JSON.stringify(scopeOptions.body));
+    const administration = await context.agent.get(`/api/users/${userId}`);
+    assert.equal(administration.status, 200, JSON.stringify(administration.body));
+    assert.equal(administration.body.user.id, userId);
 
     const edited = await context.agent.put(`/api/users/${userId}`).send({
       name: 'Pessoa Editada',
@@ -93,7 +98,9 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       'SenhaRedefinidaForte1'
     );
     assert.equal(targetLogin.status, 200, JSON.stringify(targetLogin.body));
-    const forced = await context.agent.post(`/api/users/${userId}/force-logout`);
+    const forced = await context.agent
+      .post(`/api/users/${userId}/force-logout`)
+      .send({ reason: 'Encerramento administrativo da sessao.' });
     assert.equal(forced.status, 200, JSON.stringify(forced.body));
     assert.equal((await targetAgent.get('/api/auth/me')).status, 401);
 
@@ -101,7 +108,8 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       overrides: [
         { permission: 'asset:read', effect: 'allow' },
         { permission: 'employee:read', effect: 'deny' }
-      ]
+      ],
+      reason: 'Restricao individual aprovada.'
     });
     assert.equal(overrides.status, 200, JSON.stringify(overrides.body));
     const permissions = await context.agent.get(`/api/users/${userId}/permissions`);
@@ -119,6 +127,10 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
         .all(userId),
       [{ scope_type: 'city', scope_value: 'São Paulo' }]
     );
+    const overrideAudit = context.db
+      .prepare("SELECT details FROM audit_log WHERE action='permission_override' ORDER BY id DESC LIMIT 1")
+      .get();
+    assert.equal(JSON.parse(overrideAudit.details).reason, 'Restricao individual aprovada.');
   } finally {
     context.close();
   }
@@ -144,6 +156,7 @@ test('usuario sem user:manage recebe acesso negado em todos os endpoints de usua
       200
     );
 
+    context.agent.app.setMaxListeners(20);
     const requests = [
       context.agent.get('/api/users'),
       context.agent.post('/api/users').send({
@@ -152,6 +165,8 @@ test('usuario sem user:manage recebe acesso negado em todos os endpoints de usua
         password,
         profile_base: 'TECNICO'
       }),
+      context.agent.get('/api/users/scope-options'),
+      context.agent.get(`/api/users/${target.id}`),
       context.agent.put(`/api/users/${target.id}`).send({
         name: 'Alvo',
         email: target.email,
@@ -159,7 +174,9 @@ test('usuario sem user:manage recebe acesso negado em todos os endpoints de usua
         active: true
       }),
       context.agent.post(`/api/users/${target.id}/reset-password`).send({ password }),
-      context.agent.post(`/api/users/${target.id}/force-logout`),
+      context.agent
+        .post(`/api/users/${target.id}/force-logout`)
+        .send({ reason: 'Encerramento administrativo da sessao.' }),
       context.agent
         .put(`/api/users/${target.id}/overrides`)
         .send({ overrides: [{ permission: 'asset:read', effect: 'allow' }] }),

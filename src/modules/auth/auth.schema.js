@@ -6,7 +6,8 @@ const login = z.object({
   totp_code: z.string().optional()
 });
 const password = z.object({
-  password: z.string().min(12, 'A senha deve ter ao menos 12 caracteres.')
+  password: z.string().min(12, 'A senha deve ter ao menos 12 caracteres.'),
+  reason: z.string().trim().min(3).max(500).optional()
 });
 const profileBase = z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']);
 const user = z
@@ -26,7 +27,8 @@ const userUpdate = z
     name: z.string().min(1),
     email: z.string().email(),
     profile_base: profileBase,
-    active: z.boolean()
+    active: z.boolean(),
+    reason: z.string().trim().min(3).max(500).optional()
   })
   .strict()
   .transform(({ profile_base: profileBaseValue, ...input }) => ({
@@ -47,11 +49,14 @@ const overrides = z.object({
       permission: z.string().regex(/^[a-z*]+:[a-z*]+$/),
       effect: z.enum(['allow', 'deny'])
     })
-  )
+  ),
+  reason: z.string().trim().min(3).max(500).optional()
 });
 const scopes = z.object({
   scopes: z.array(
     z.object({ type: z.enum(['city', 'department', 'equipment_type']), value: z.string().min(1) })
-  )
+  ),
+  reason: z.string().trim().min(3).max(500).optional()
 });
-module.exports = { login, password, user, userUpdate, id, userList, totp, overrides, scopes };
+const reason = z.object({ reason: z.string().trim().min(3).max(500) });
+module.exports = { login, password, user, userUpdate, id, userList, totp, overrides, scopes, reason };

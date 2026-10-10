@@ -6,6 +6,8 @@ const path = require('node:path');
 const coverage = new Map([
   ['GET /api/users', { happy: true, denied: true }],
   ['POST /api/users', { happy: true, denied: true }],
+  ['GET /api/users/scope-options', { happy: true, denied: true }],
+  ['GET /api/users/:id', { happy: true, denied: true }],
   ['PUT /api/users/:id', { happy: true, denied: true }],
   ['POST /api/users/:id/reset-password', { happy: true, denied: true }],
   ['POST /api/users/:id/force-logout', { happy: true, denied: true }],

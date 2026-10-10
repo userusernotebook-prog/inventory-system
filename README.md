@@ -80,6 +80,8 @@ As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conced
 
 Todos entram por e-mail e senha. O admin cadastra usuarios com senha provisoria; eles precisam troca-la no primeiro acesso. Sessao usa cookie `httpOnly`, `SameSite=Strict`, `Secure` em producao, expiracao e bloqueio temporario apos tentativas falhas. O header `x-technician-id` nao e aceito.
 
+Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra contas por perfil e status, cria e edita usuarios, ativa/desativa contas, redefine senhas provisorias e encerra sessoes. A tela de cada usuario mostra overrides em tres estados (herdar, permitir e negar), a origem da permissao efetiva, alcance por cidade/departamento/tipo de equipamento e uma pre-visualizacao antes do salvamento. Alteracoes administrativas exigem motivo e sao registradas na auditoria.
+
 ## Fluxo de aprovacoes
 
 1. Um usuario com `request:create` abre uma solicitacao com justificativa e ativos.
