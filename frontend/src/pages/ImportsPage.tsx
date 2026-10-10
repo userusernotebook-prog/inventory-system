@@ -1,0 +1,17 @@
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { ErrorState } from '../components/Feedback';
+import { api, HttpError } from '../lib/api';
+
+type Preview = { valid: boolean; format: string; summary: { employees: number; assets: number; tickets?: number; skipped: number } | null; errors: Array<{ sheet: string | null; line: number | null; message: string }> };
+const message = (error: unknown) => error instanceof HttpError || error instanceof Error ? error.message : 'Não foi possível validar a planilha.';
+const formData = (file: File) => { const data = new FormData(); data.append('file', file); return data; };
+
+export function ImportsPage() {
+  const [file, setFile] = useState<File>();
+  const [preview, setPreview] = useState<Preview>();
+  const [result, setResult] = useState<{ employees: number; assets: number; tickets?: number; skipped: number }>();
+  const validation = useMutation({ mutationFn: (selected: File) => api<Preview>('/api/import/excel/preview', { method: 'POST', body: formData(selected) }), onSuccess: (value) => { setPreview(value); setResult(undefined); } });
+  const importing = useMutation({ mutationFn: (selected: File) => api<{ employees: number; assets: number; tickets?: number; skipped: number }>('/api/import/excel', { method: 'POST', body: formData(selected) }), onSuccess: (value) => setResult(value) });
+  return <section className="max-w-3xl"><h1 className="text-2xl font-bold">Importar Excel</h1><p className="mt-1 text-slate-600">Pré-valide os dados antes de confirmar a importação. Nada é gravado durante a prévia.</p><section className="card mt-5 space-y-4"><a className="btn-secondary" href="/api/templates/initial">Baixar modelo de importação</a><label className="label">Planilha (.xlsx ou .xlsm)<input className="field mt-1" aria-label="Planilha Excel" type="file" accept=".xlsx,.xlsm" onChange={(event) => { setFile(event.target.files?.[0]); setPreview(undefined); setResult(undefined); }} /></label><button className="btn-primary" disabled={!file || validation.isPending} onClick={() => file && validation.mutate(file)}>Pré-validar planilha</button>{validation.error && <ErrorState error={validation.error} />}</section>{preview && <section className="card mt-5"><h2 className="font-bold">Resultado da pré-validação</h2><p className="mt-2 text-sm">Formato identificado: {preview.format === 'MODELO_INICIAL' ? 'Modelo inicial' : 'Planilha legada'}.</p>{preview.valid && preview.summary ? <><p className="mt-2 text-sm">Pronta para importar: {preview.summary.employees} funcionário(s), {preview.summary.assets} ativo(s), {preview.summary.skipped} registro(s) já existente(s).</p><button className="btn-primary mt-4" disabled={!file || importing.isPending} onClick={() => file && importing.mutate(file)}>Confirmar importação</button></> : <><p className="mt-2 text-sm text-red-700">Corrija os erros abaixo antes de importar.</p><table className="table mt-3"><thead><tr><th>Aba</th><th>Linha</th><th>Erro</th></tr></thead><tbody>{preview.errors.map((error, index) => <tr key={index}><td>{error.sheet || '-'}</td><td>{error.line || '-'}</td><td>{error.message}</td></tr>)}</tbody></table></>}</section>}{importing.error && <section className="mt-5"><ErrorState error={importing.error} /></section>}{result && <section className="card mt-5" aria-live="polite"><h2 className="font-bold">Importação concluída</h2><p className="mt-2">Foram importados {result.employees} funcionário(s) e {result.assets} ativo(s). Registros ignorados: {result.skipped}.</p></section>}</section>;
+}

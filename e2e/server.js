@@ -92,6 +92,19 @@ async function seed(db) {
   db.prepare(
     'INSERT INTO assignments(asset_id, employee_id, responsible_user_id) VALUES(?, ?, ?)'
   ).run(uiOffboardingAssetId, uiOffboardingEmployeeId, technicianId);
+  const ticketEmployeeId = db
+    .prepare(
+      "INSERT INTO employees(name, email, status) VALUES('Pessoa Chamados Interface E2E', 'chamados-ui.e2e@example.test', 'ativo')"
+    )
+    .run().lastInsertRowid;
+  const ticketAssetId = db
+    .prepare(
+      "INSERT INTO assets(equipment_type, serial, hostname, status) VALUES('Notebook', 'E2E-TICKET-UI', 'ticket-ui-e2e', 'EM_USO')"
+    )
+    .run().lastInsertRowid;
+  db.prepare(
+    'INSERT INTO assignments(asset_id, employee_id, responsible_user_id) VALUES(?, ?, ?)'
+  ).run(ticketAssetId, ticketEmployeeId, technicianId);
 }
 
 async function main() {
