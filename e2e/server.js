@@ -4,6 +4,7 @@ const { migrate } = require('../src/db/migrate');
 const { createApp } = require('../src/app');
 
 async function seed(db) {
+  const enrollmentMode = process.env.E2E_TOTP_ENROLLMENT === '1';
   const passwordHash = await argon2.hash('SenhaDeTesteForte1');
   const insertUser = db.prepare(
     `INSERT INTO users(
@@ -16,8 +17,8 @@ async function seed(db) {
     passwordHash,
     'ADMIN',
     0,
-    1,
-    'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'
+    enrollmentMode ? 0 : 1,
+    enrollmentMode ? null : 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'
   );
   insertUser.run('RH E2E', 'rh.e2e@example.test', passwordHash, 'RH', 0, 0, null);
   const deniedUserId = insertUser.run(
