@@ -28,11 +28,15 @@ function decryptTotpSecret(value, keyValue) {
   ]).toString('utf8');
 }
 
-function migrateTotpSecrets(db, keyValue) {
-  if (!keyValue) return 0;
+// A chave só é resolvida quando existe segredo legado em texto puro para cifrar.
+function migrateTotpSecrets(db, resolveKey) {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").get())
+    return 0;
   const rows = db
     .prepare("SELECT id,totp_secret FROM users WHERE totp_secret IS NOT NULL AND totp_secret NOT LIKE 'v1:%'")
     .all();
+  if (!rows.length) return 0;
+  const keyValue = resolveKey();
   const update = db.prepare('UPDATE users SET totp_secret=?,updated_at=? WHERE id=?');
   const now = new Date().toISOString();
   db.transaction(() => {

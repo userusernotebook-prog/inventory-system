@@ -4,6 +4,7 @@ const { generateSecret, generateURI, verify } = require('otplib');
 const { ForbiddenError, UnauthorizedError, ValidationError } = require('../../shared/errors');
 const { pageResult } = require('../../shared/utils/query');
 const { decryptTotpSecret, encryptTotpSecret } = require('./totp-crypto');
+const { resolveTotpEncryptionKey } = require('../../config/totp-key');
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
@@ -13,6 +14,13 @@ const hashToken = (token) => crypto.createHash('sha256').update(token).digest('h
 async function hasValidTotp(token, secret) {
   const result = await verify({ token, secret });
   return result.valid;
+}
+
+// Segredos legados em texto puro ainda são lidos; só os cifrados exigem a chave.
+function readTotpSecret(stored) {
+  return stored && stored.startsWith('v1:')
+    ? decryptTotpSecret(stored, resolveTotpEncryptionKey())
+    : stored;
 }
 
 function createAuthService(repository, auditService) {
@@ -75,10 +83,7 @@ function createAuthService(repository, auditService) {
     }
     if (
       user.totp_enabled &&
-      !(await hasValidTotp(
-        String(input.totp_code || ''),
-        decryptTotpSecret(user.totp_secret, process.env.TOTP_ENCRYPTION_KEY)
-      ))
+      !(await hasValidTotp(String(input.totp_code || ''), readTotpSecret(user.totp_secret)))
     )
       throw new UnauthorizedError('Código de autenticação inválido.');
     repository.updateLogin(user.id);
@@ -180,17 +185,12 @@ function createAuthService(repository, auditService) {
     },
     setupTotp(user) {
       const secret = generateSecret();
-      repository.setTotp(user.id, encryptTotpSecret(secret, process.env.TOTP_ENCRYPTION_KEY), false);
+      repository.setTotp(user.id, encryptTotpSecret(secret, resolveTotpEncryptionKey()), false);
       return { secret, uri: generateURI({ issuer: 'Inventário TI', label: user.email, secret }) };
     },
     async confirmTotp(user, code) {
       const fresh = repository.findById(user.id);
-      if (
-        !(await hasValidTotp(
-          code,
-          decryptTotpSecret(fresh.totp_secret, process.env.TOTP_ENCRYPTION_KEY)
-        ))
-      )
+      if (!(await hasValidTotp(code, readTotpSecret(fresh.totp_secret))))
         throw new ValidationError('Código TOTP inválido.');
       repository.setTotp(user.id, fresh.totp_secret, true);
       return { ok: true };
