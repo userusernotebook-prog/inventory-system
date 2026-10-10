@@ -22,6 +22,16 @@ function createMovementsRepository(db) {
           new Date().toISOString()
         ).lastInsertRowid;
     },
+    // Reserva vigente: solicitação ainda PENDENTE e dentro do prazo.
+    activeReservation(assetId) {
+      return db
+        .prepare(
+          `SELECT r.request_id FROM approval_asset_reservations r
+          JOIN approval_requests q ON q.id=r.request_id
+          WHERE r.asset_id=? AND q.status='PENDENTE' AND q.expires_at>?`
+        )
+        .get(assetId, new Date().toISOString());
+    },
     listAssetHistory(assetId) {
       return db
         .prepare(

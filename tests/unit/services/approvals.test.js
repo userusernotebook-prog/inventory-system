@@ -112,7 +112,7 @@ test('aprova backup, reserva ativo e bloqueia contorno via /move', () => {
           },
           ctx.admin
         ),
-      /exige uma solicitação aprovada/
+      /reservado pela solicitação/
     );
     assert.deepEqual(ctx.approvals.approve(request.id, ctx.admin), {
       ok: true,

@@ -95,7 +95,7 @@ Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra
 ## Fluxo de aprovacoes
 
 1. Um usuario com `request:create` abre uma solicitacao com justificativa e ativos.
-2. O ativo fica reservado enquanto a solicitacao estiver `PENDENTE`.
+2. O ativo fica reservado enquanto a solicitacao estiver `PENDENTE`: qualquer mudanca de estado por outra rota (`/move`, desligamento, destino) e recusada com 409 "Ativo reservado pela solicitacao #N". So a execucao da propria solicitacao move o ativo; rejeicao, cancelamento ou expiracao liberam a reserva.
 3. Somente `request:approve` aprova ou rejeita. O administrador pode autoaprovar, e isso e auditado.
 4. A aprovacao revalida o estado e executa a movimentacao na mesma transacao.
 5. Troca movimenta o ativo antigo para avaliacao e atribui o novo; backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.

@@ -1,4 +1,4 @@
-const { ValidationError } = require('../../shared/errors');
+const { ConflictError, ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const {
   ASSET_STATES,
@@ -38,6 +38,11 @@ function createMovementsService(
     const asset = assetsRepository.findById(assetId);
     if (!asset) throw new ValidationError('Equipamento não encontrado.');
     authService.assertScope(user, asset);
+    // Enquanto houver solicitação pendente, só a execução dela move o ativo.
+    const reservation = movementsRepository.activeReservation(assetId);
+    if (reservation && Number(options.approvedRequestId) !== reservation.request_id) {
+      throw new ConflictError(`Ativo reservado pela solicitação #${reservation.request_id}.`);
+    }
 
     const openAssignment = assignmentsRepository.findOpenForAsset(assetId);
     const fromEmployeeId = openAssignment?.employee_id || null;
