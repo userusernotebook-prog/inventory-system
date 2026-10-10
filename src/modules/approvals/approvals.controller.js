@@ -10,13 +10,13 @@ function createApprovalsController(service) {
       res.json(service.get(req.validated.params.id, req.user));
     },
     approve(req, res) {
-      res.json(service.approve(req.validated.params.id, req.user));
+      res.json(service.approve(req.validated.params.id, req.user, req.validated.body.reason));
     },
     reject(req, res) {
       res.json(service.reject(req.validated.params.id, req.validated.body.reason, req.user));
     },
     cancel(req, res) {
-      res.json(service.cancel(req.validated.params.id, req.user));
+      res.json(service.cancel(req.validated.params.id, req.user, req.validated.body.reason));
     },
     pendingCount(req, res) {
       res.json({ count: service.pendingCount(req.user) });

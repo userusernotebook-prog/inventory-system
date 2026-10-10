@@ -33,6 +33,7 @@ function createApprovalsRoutes(service, authService) {
     '/api/approval-requests/:id/approve',
     ...requirePermission(authService, 'request:approve'),
     validate(schema.params, 'params'),
+    validate(schema.decision, 'body'),
     controller.approve
   );
   router.post(
@@ -46,6 +47,7 @@ function createApprovalsRoutes(service, authService) {
     '/api/approval-requests/:id/cancel',
     ...requirePermission(authService, 'request:create'),
     validate(schema.params, 'params'),
+    validate(schema.decision, 'body'),
     controller.cancel
   );
   router.get(

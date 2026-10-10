@@ -64,6 +64,12 @@ async function seed(db) {
   db.prepare(
     'INSERT INTO assignments(asset_id, employee_id, responsible_user_id) VALUES(?, ?, ?)'
   ).run(assetId, employeeId, technicianId);
+  db.prepare(
+    "INSERT INTO employees(name, email, status) VALUES('Pessoa Aprovacao E2E', 'aprovacao.e2e@example.test', 'ativo')"
+  ).run();
+  db.prepare(
+    "INSERT INTO assets(equipment_type, serial, hostname, status) VALUES('Notebook', 'E2E-BACKUP-APPROVAL', 'backup-approval-e2e', 'BACKUP')"
+  ).run();
 }
 
 async function main() {

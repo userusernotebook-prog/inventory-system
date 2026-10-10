@@ -219,7 +219,7 @@ function createApprovalsService(
         throw new ForbiddenError();
       return detail;
     },
-    approve(id, approver) {
+    approve(id, approver, reason) {
       authService.authorize(approver, 'request:approve');
       return db.transaction(() => {
         expireDueRequests();
@@ -229,7 +229,7 @@ function createApprovalsService(
         repository.decide(id, 'APROVADA', approver.id, null);
         repository.markExecuted(id);
         repository.release(id);
-        repository.addEvent(id, 'APROVADA', approver.id, { auto_approved: autoApproved });
+        repository.addEvent(id, 'APROVADA', approver.id, { auto_approved: autoApproved, reason });
         for (const result of results)
           repository.addEvent(id, 'EXECUTADA', approver.id, {}, result.movementId);
         repository.notify(
@@ -239,7 +239,7 @@ function createApprovalsService(
           'Sua solicitação foi aprovada e executada.'
         );
         auditService.logUser(approver, 'approval_approved', 'approval_request', id, {
-          after: { auto_approved: autoApproved }
+          after: { auto_approved: autoApproved, reason }
         });
         return { ok: true, auto_approved: autoApproved };
       })();
@@ -266,7 +266,7 @@ function createApprovalsService(
         return { ok: true };
       })();
     },
-    cancel(id, user) {
+    cancel(id, user, reason) {
       return db.transaction(() => {
         expireDueRequests();
         const request = getPending(id);
@@ -274,8 +274,8 @@ function createApprovalsService(
           throw new ForbiddenError('Somente o solicitante pode cancelar.');
         repository.cancel(id);
         repository.release(id);
-        repository.addEvent(id, 'CANCELADA', user.id, {});
-        auditService.logUser(user, 'approval_cancelled', 'approval_request', id, {});
+        repository.addEvent(id, 'CANCELADA', user.id, { reason });
+        auditService.logUser(user, 'approval_cancelled', 'approval_request', id, { reason });
         return { ok: true };
       })();
     },

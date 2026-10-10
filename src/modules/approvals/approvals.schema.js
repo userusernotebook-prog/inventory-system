@@ -30,4 +30,8 @@ const list = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25)
 });
 const reject = z.object({ reason: z.string().trim().min(3).max(1000) }).strict();
-module.exports = { create, params, list, reject };
+const decision = z
+  .object({ reason: z.string().trim().min(3).max(1000).optional() })
+  .strict()
+  .default({});
+module.exports = { create, params, list, reject, decision };

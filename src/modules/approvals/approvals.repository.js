@@ -65,16 +65,35 @@ function createApprovalsRepository(db) {
         .all(requestId);
     },
     details(id) {
-      const request = this.findById(id);
+      const request = db
+        .prepare(
+          `SELECT r.*,e.name employee_name,u.name requester_name,approver.name approver_name
+          FROM approval_requests r
+          LEFT JOIN employees e ON e.id=r.employee_id
+          JOIN users u ON u.id=r.requester_user_id
+          LEFT JOIN users approver ON approver.id=r.approved_by_user_id WHERE r.id=?`
+        )
+        .get(id);
       if (!request) return null;
       return {
         ...request,
-        assets: this.assets(id),
+        assets: this.assets(id).map((asset) => ({
+          ...asset,
+          history: db
+            .prepare(
+              `SELECT movement_type,from_status,to_status,reason,occurred_at
+              FROM movements WHERE asset_id=? ORDER BY occurred_at DESC LIMIT 20`
+            )
+            .all(asset.asset_id)
+        })),
         attachments: db
           .prepare('SELECT name,url FROM approval_request_attachments WHERE request_id=?')
           .all(id),
         events: db
-          .prepare('SELECT * FROM approval_request_events WHERE request_id=? ORDER BY id')
+          .prepare(
+            `SELECT event.*,u.name actor_name FROM approval_request_events event
+            LEFT JOIN users u ON u.id=event.actor_user_id WHERE event.request_id=? ORDER BY event.id`
+          )
           .all(id)
       };
     },
