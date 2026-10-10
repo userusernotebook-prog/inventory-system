@@ -8,22 +8,45 @@ async function seed(db) {
   const insertUser = db.prepare(
     `INSERT INTO users(
       name, email, password_hash, profile_base, must_change_password, totp_enabled, totp_secret
-    ) VALUES (?, ?, ?, ?, 0, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   insertUser.run(
     'Administrador E2E',
     'admin.e2e@example.test',
     passwordHash,
     'ADMIN',
+    0,
     1,
     'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'
   );
-  insertUser.run('RH E2E', 'rh.e2e@example.test', passwordHash, 'RH', 0, null);
+  insertUser.run('RH E2E', 'rh.e2e@example.test', passwordHash, 'RH', 0, 0, null);
+  const deniedUserId = insertUser.run(
+    'Consulta sem ativos',
+    'sem-ativos.e2e@example.test',
+    passwordHash,
+    'CONSULTA',
+    0,
+    0,
+    null
+  ).lastInsertRowid;
+  db.prepare(
+    "INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?, 'asset:read', 'deny')"
+  ).run(deniedUserId);
+  insertUser.run(
+    'Senha provisoria',
+    'provisoria.e2e@example.test',
+    passwordHash,
+    'CONSULTA',
+    1,
+    0,
+    null
+  );
   const technicianId = insertUser.run(
     'Tecnico E2E',
     'tecnico.e2e@example.test',
     passwordHash,
     'TECNICO',
+    0,
     0,
     null
   ).lastInsertRowid;

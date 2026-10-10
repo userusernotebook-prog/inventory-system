@@ -26,6 +26,7 @@
     "format:check": "prettier --check \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"e2e/**/*.js\" \"frontend/**/*.{ts,tsx,css,html}\" \"*.{json,md,yml,yaml}\" .prettierrc.json"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
     "@tanstack/react-query": "^5.90.21",
     "age-encryption": "^0.3.1",
     "argon2": "^0.45.1",
@@ -38,6 +39,7 @@
     "otplib": "^13.5.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-hook-form": "^7.89.0",
     "react-router-dom": "^7.18.4",
     "swagger-ui-express": "^5.0.1",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",

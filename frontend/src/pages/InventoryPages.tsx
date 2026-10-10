@@ -32,7 +32,6 @@ function ListToolbar({
 export function EmployeesPage() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
-  const { user } = useAuth();
   const query = useQuery({
     queryKey: ['employees', page, q],
     queryFn: () => api<Page<Employee>>(`/api/employees?${queryString({ page, pageSize: 25, q })}`)
@@ -47,11 +46,6 @@ export function EmployeesPage() {
           <h1 className="text-2xl font-bold">Funcionários</h1>
           <p className="text-slate-600">Cadastros, ativos vinculados e desligamentos.</p>
         </div>
-        {canUser(user, 'employee:create') && (
-          <button className="btn-primary" disabled>
-            + Novo funcionário
-          </button>
-        )}
       </div>
       <ListToolbar
         label="funcionários"
@@ -105,7 +99,6 @@ export function EmployeesPage() {
 export function AssetsPage() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
-  const { user } = useAuth();
   const query = useQuery({
     queryKey: ['assets', page, q],
     queryFn: () => api<Page<Asset>>(`/api/assets?${queryString({ page, pageSize: 25, q })}`)
@@ -120,11 +113,6 @@ export function AssetsPage() {
           <h1 className="text-2xl font-bold">Ativos</h1>
           <p className="text-slate-600">Inventário e situação operacional.</p>
         </div>
-        {canUser(user, 'asset:create') && (
-          <button className="btn-primary" disabled>
-            + Novo ativo
-          </button>
-        )}
       </div>
       <ListToolbar
         label="ativos"
@@ -179,7 +167,6 @@ export function AssetsPage() {
 }
 export function AssetDetailPage() {
   const { id } = useParams();
-  const { user } = useAuth();
   const asset = useQuery({
     queryKey: ['asset', id],
     queryFn: () => api<Asset>(`/api/assets/${id}`)
@@ -201,14 +188,6 @@ export function AssetDetailPage() {
   if (asset.isLoading || history.isLoading) return <Loading />;
   if (asset.error || history.error) return <ErrorState error={asset.error || history.error} />;
   const current = asset.data!;
-  const transitions: Record<string, string[]> = {
-    DISPONIVEL: ['EM_USO', 'BACKUP', 'EM_AVALIACAO'],
-    EM_USO: ['PENDENTE_DEVOLUCAO', 'EM_AVALIACAO'],
-    PENDENTE_DEVOLUCAO: ['EM_AVALIACAO'],
-    EM_AVALIACAO: ['BACKUP', 'EM_MANUTENCAO', 'DESATIVADO'],
-    BACKUP: ['EM_USO'],
-    EM_MANUTENCAO: ['EM_AVALIACAO']
-  };
   return (
     <section>
       <Link className="text-sm text-blue-700" to="/assets">
@@ -248,21 +227,10 @@ export function AssetDetailPage() {
           </ol>
         </section>
         <aside className="card">
-          <h2 className="font-bold">Transições disponíveis</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Somente opções permitidas pelo estado atual.
+          <h2 className="font-bold">Status atual</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            As movimentações serão disponibilizadas no módulo de ativos.
           </p>
-          <div className="mt-4 grid gap-2">
-            {(transitions[current.status] || []).map((target) => (
-              <button
-                className="btn-secondary justify-start"
-                key={target}
-                disabled={!canUser(user, 'asset:update')}
-              >
-                {target.replaceAll('_', ' ')}
-              </button>
-            ))}
-          </div>
         </aside>
       </div>
     </section>
@@ -302,11 +270,6 @@ export function EmployeeDetailPage() {
             {person.department || 'Sem departamento'} · {person.city || 'Sem cidade'}
           </p>
         </div>
-        {canUser(user, 'employee:offboard') && person.status === 'ativo' && (
-          <button className="btn-primary" disabled>
-            Iniciar desligamento
-          </button>
-        )}
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <section className="card">

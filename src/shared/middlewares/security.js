@@ -7,7 +7,13 @@ function allowedOrigins() {
     .map((value) => value.trim())
     .filter(Boolean);
   if (process.env.NODE_ENV !== 'production')
-    configured.push('http://localhost:3000', 'http://localhost:5173');
+    configured.push(
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:4173',
+      'http://127.0.0.1:5173'
+    );
   return new Set(configured);
 }
 

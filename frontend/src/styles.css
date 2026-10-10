@@ -44,6 +44,9 @@
   .label {
     @apply mb-1 block text-sm font-medium text-slate-700;
   }
+  .field-error {
+    @apply -mt-2 text-sm text-red-700;
+  }
   .table {
     @apply min-w-full text-left text-sm;
   }
