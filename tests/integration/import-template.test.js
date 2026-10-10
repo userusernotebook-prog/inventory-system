@@ -70,6 +70,13 @@ test('a importacao pela API e atomica para o modelo novo e para a planilha legad
       email: 'tecnico@example.test',
       profile: 'TECNICO'
     });
+    // Carga inicial (EM_USO, DESATIVADO, planilha legada) e criação de funcionários
+    // exigem permissões próprias desde a Rodada 2.
+    for (const permission of ['import:initial_load', 'employee:create']) {
+      context.db
+        .prepare('INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?,?,?)')
+        .run(technician.id, permission, 'allow');
+    }
     assert.equal((await login(context.agent, technician.email, technician.password)).status, 200);
 
     const template = await context.agent.get('/api/templates/initial');

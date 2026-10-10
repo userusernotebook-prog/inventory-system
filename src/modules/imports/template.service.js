@@ -60,11 +60,17 @@ const assetStatuses = {
   BACKUP: ASSET_STATES.BACKUP,
   MANUTENCAO: ASSET_STATES.UNDER_MAINTENANCE,
   EMAVALIACAO: ASSET_STATES.UNDER_EVALUATION,
-  PENDENTEDEVOLUCAO: ASSET_STATES.RETURN_PENDING,
   DESATIVADO: ASSET_STATES.DEACTIVATED
 };
+// Sem import:initial_load só entra estoque: novo (DISPONIVEL) ou BACKUP.
+const STOCK_STATUSES = [ASSET_STATES.AVAILABLE, ASSET_STATES.BACKUP];
+const RESTRICTED_POLICY = Object.freeze({
+  initialLoad: false,
+  createEmployees: false,
+  inScope: () => true
+});
 
-function importTemplate(repository, workbook, responsibleUserId) {
+function importTemplate(repository, workbook, responsibleUserId, policy = RESTRICTED_POLICY) {
   const employees = readSheet(workbook, 'Funcionarios', ['CÓDIGO', 'NOME', 'STATUS']);
   const assets = readSheet(workbook, 'Ativos', [
     'CÓDIGO FUNCIONÁRIO',
@@ -134,13 +140,25 @@ function importTemplate(repository, workbook, responsibleUserId) {
       );
     }
     const status = statusText === 'ATIVO' ? 'ativo' : 'desligado';
+    if (!policy.createEmployees) {
+      throw new ValidationError(
+        `Funcionarios, linha ${row.line}: criar funcionários exige a permissão employee:create.`
+      );
+    }
+    const city = field(row, 'CIDADE') || null;
+    const department = field(row, 'DEPARTAMENTO') || null;
+    if (!policy.inScope({ city, department })) {
+      throw new ValidationError(
+        `Funcionarios, linha ${row.line}: cidade ou departamento fora do seu alcance.`
+      );
+    }
     const id = repository.insertTemplateEmployee({
       code,
       name,
       email: field(row, 'E-MAIL') || null,
-      department: field(row, 'DEPARTAMENTO') || null,
+      department,
       costCenter: field(row, 'CENTRO DE CUSTO') || null,
-      city: field(row, 'CIDADE') || null,
+      city,
       location: field(row, 'LOCALIDADE') || null,
       corporatePhone: field(row, 'TELEFONE CORPORATIVO') || null,
       personalPhone: field(row, 'TELEFONE PESSOAL') || null,
@@ -148,7 +166,7 @@ function importTemplate(repository, workbook, responsibleUserId) {
       hireDate,
       offboardedAt
     });
-    employeeIds.set(key(code), { id, status });
+    employeeIds.set(key(code), { id, status, city, department });
     createdEmployees++;
   }
 
@@ -158,7 +176,13 @@ function importTemplate(repository, workbook, responsibleUserId) {
     const serial = field(row, 'SERIAL');
     const reference = field(row, 'REFERÊNCIA');
     const employeeCode = field(row, 'CÓDIGO FUNCIONÁRIO');
-    const status = assetStatuses[key(field(row, 'STATUS'))];
+    const statusKey = key(field(row, 'STATUS'));
+    if (statusKey === 'PENDENTEDEVOLUCAO') {
+      throw new ValidationError(
+        `Ativos, linha ${row.line}: devolução pendente só existe no fluxo de desligamento.`
+      );
+    }
+    const status = assetStatuses[statusKey];
     const reason = field(row, 'MOTIVO / OBSERVAÇÃO');
     const technicalReport = field(row, 'LAUDO TÉCNICO');
     if (!type || !status) {
@@ -184,6 +208,11 @@ function importTemplate(repository, workbook, responsibleUserId) {
         `Ativos, linha ${row.line}: a desativação exige MOTIVO / OBSERVAÇÃO e LAUDO TÉCNICO.`
       );
     }
+    if (!policy.initialLoad && !STOCK_STATUSES.includes(status)) {
+      throw new ValidationError(
+        `Ativos, linha ${row.line}: o status ${status} exige a permissão import:initial_load (carga inicial); sem ela entram só DISPONIVEL ou BACKUP, sem atribuição.`
+      );
+    }
 
     const serialKey = key(serial);
     const referenceKey = key(reference);
@@ -203,6 +232,7 @@ function importTemplate(repository, workbook, responsibleUserId) {
     }
 
     let employeeId = null;
+    let employeeDepartment = null;
     if (status === ASSET_STATES.IN_USE) {
       let employee = employeeIds.get(key(employeeCode));
       if (!employee) {
@@ -220,6 +250,19 @@ function importTemplate(repository, workbook, responsibleUserId) {
         );
       }
       employeeId = employee.id;
+      employeeDepartment = employee.department ?? null;
+    }
+    // Mesmo alcance da leitura: cidade e tipo do ativo, departamento de quem o recebe.
+    if (
+      !policy.inScope({
+        city: field(row, 'CIDADE') || null,
+        equipment_type: type,
+        department: employeeDepartment
+      })
+    ) {
+      throw new ValidationError(
+        `Ativos, linha ${row.line}: cidade, tipo ou departamento fora do seu alcance.`
+      );
     }
 
     const id = repository.insertTemplateAsset({

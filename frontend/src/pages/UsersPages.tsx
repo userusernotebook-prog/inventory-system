@@ -48,7 +48,8 @@ const permissionsByModule: Record<string, string[]> = {
   Chamados: ['ticket:read', 'ticket:create'],
   // request:approve, user:manage e audit:read sao exclusivas do ADMIN e nao podem ser concedidas.
   Solicitacoes: ['request:create'],
-  Relatorios: ['report:financial']
+  Relatorios: ['report:financial'],
+  Importacao: ['import:initial_load']
 };
 
 const userSchema = z.object({

@@ -1,5 +1,13 @@
 const { readRows } = require('../../shared/utils/workbook-reader');
 const { text, norm } = require('../../shared/utils/text');
+const { ValidationError } = require('../../shared/errors');
+const { ASSET_STATES } = require('../assets/domain/asset-state-machine');
+
+const RESTRICTED_POLICY = Object.freeze({
+  initialLoad: false,
+  createEmployees: false,
+  inScope: () => true
+});
 
 function sheetRows(workbook, names) {
   for (const name of names) {
@@ -34,102 +42,151 @@ function col(row, ...names) {
   return null;
 }
 
-function importLegacy(repository, workbook, responsibleUserId) {
+// A planilha legada é uma carga histórica (funcionários, ativos em uso e
+// chamados): exige import:initial_load. Equipamento legado sem dono é usado,
+// então entra em BACKUP (nunca em DISPONIVEL, regra R1).
+function importLegacy(repository, workbook, responsibleUserId, policy = RESTRICTED_POLICY) {
+  if (!policy.initialLoad) {
+    throw new ValidationError(
+      'A planilha legada é uma carga inicial e exige a permissão import:initial_load.'
+    );
+  }
   let employees = 0;
   let assets = 0;
   let tickets = 0;
   let skipped = 0;
 
+  function createEmployee(sheet, line, code, name, city, department) {
+    if (!policy.createEmployees) {
+      throw new ValidationError(
+        `${sheet}, linha ${line}: criar funcionários exige a permissão employee:create.`
+      );
+    }
+    if (!policy.inScope({ city, department })) {
+      throw new ValidationError(`${sheet}, linha ${line}: funcionário fora do seu alcance.`);
+    }
+    employees++;
+    const id = repository.insertLegacyEmployee(code, name, city, department);
+    return { id, status: 'ativo', city, department };
+  }
+
   const employeeRows = tableObjects(sheetRows(workbook, ['cadastro solicitante e técnicos']), [
     'NOME SOLICITANTE'
   ]);
-  for (const row of employeeRows) {
+  employeeRows.forEach((row, index) => {
     const name = col(row, 'NOME SOLICITANTE');
-    if (!name) continue;
+    if (!name) return;
     if (repository.findEmployeeByName(name)) {
       skipped++;
-      continue;
+      return;
     }
-    repository.insertLegacyEmployee(
+    createEmployee(
+      'cadastro solicitante e técnicos',
+      index + 2,
       col(row, 'CÓDIGO'),
       name,
       col(row, 'CIDADE'),
       col(row, 'SETOR')
     );
-    employees++;
-  }
+  });
 
   const assetRows = tableObjects(sheetRows(workbook, ['controle máquinas_Uso']), [
     'FUNCIONARIO',
     'SERIAL',
     'EQUIPAMENTO'
   ]);
-  for (const row of assetRows) {
+  assetRows.forEach((row, index) => {
+    const line = index + 2;
     const type = col(row, 'EQUIPAMENTO');
-    if (!type) continue;
+    if (!type) return;
     const serial = col(row, 'SERIAL');
     const hostname = col(row, 'HOSTNAME');
     if (repository.legacyAssetExists(serial || '__none__', hostname)) {
       skipped++;
-      continue;
+      return;
     }
-    try {
-      const assetId = repository.insertLegacyAsset({
-        hostname,
-        type,
-        manufacturer: col(row, 'FABRICANTE'),
-        model: col(row, 'MODELO'),
-        serial,
-        description: col(row, 'DESCRIÇÃO'),
-        imei1: col(row, 'IMEI 1'),
-        imei2: col(row, 'IMEI 2'),
-        appleId: col(row, 'ID Apple'),
-        reference: col(row, 'REFERÊNCIA'),
-        conditionText: col(row, 'CONDIÇÕES DE USO'),
+    const employeeName = col(row, 'FUNCIONARIO');
+    let employee = null;
+    if (employeeName) {
+      employee =
+        repository.findEmployeeByName(employeeName) ||
+        createEmployee(
+          'controle máquinas_Uso',
+          line,
+          null,
+          employeeName,
+          col(row, 'CIDADE'),
+          col(row, 'DEPARTAMENTO')
+        );
+    }
+    const holder = employee && employee.status === 'ativo' ? employee : null;
+    const status = holder ? ASSET_STATES.IN_USE : ASSET_STATES.BACKUP;
+    if (
+      !policy.inScope({
         city: col(row, 'CIDADE'),
-        location: col(row, 'LOCALIDADE'),
-        activatedAt: col(row, 'DATA DE ACTIVAÇÃO'),
-        replacedAt: col(row, 'DATA DE TROCA')
-      });
-      assets++;
-      const employeeName = col(row, 'FUNCIONARIO');
-      if (employeeName) {
-        let employee = repository.findEmployeeByName(employeeName);
-        if (!employee) {
-          employee = {
-            id: repository.insertLegacyEmployee(
-              null,
-              employeeName,
-              col(row, 'CIDADE'),
-              col(row, 'DEPARTAMENTO')
-            )
-          };
-          employees++;
-        }
-        repository.assignLegacyAsset(assetId, employee.id, responsibleUserId);
-      }
-    } catch (error) {
-      skipped++;
-      console.warn('Ativo legado ignorado após falha de gravação:', error.code || error.name);
+        equipment_type: type,
+        department: holder ? (holder.department ?? null) : null
+      })
+    ) {
+      throw new ValidationError(
+        `controle máquinas_Uso, linha ${line}: cidade, tipo ou departamento fora do seu alcance.`
+      );
     }
-  }
+    const assetId = repository.insertLegacyAsset({
+      hostname,
+      type,
+      manufacturer: col(row, 'FABRICANTE'),
+      model: col(row, 'MODELO'),
+      serial,
+      description: col(row, 'DESCRIÇÃO'),
+      imei1: col(row, 'IMEI 1'),
+      imei2: col(row, 'IMEI 2'),
+      appleId: col(row, 'ID Apple'),
+      reference: col(row, 'REFERÊNCIA'),
+      conditionText: col(row, 'CONDIÇÕES DE USO'),
+      city: col(row, 'CIDADE'),
+      location: col(row, 'LOCALIDADE'),
+      activatedAt: col(row, 'DATA DE ACTIVAÇÃO'),
+      replacedAt: col(row, 'DATA DE TROCA'),
+      status
+    });
+    if (holder) repository.insertAssignment(assetId, holder.id, responsibleUserId);
+    repository.insertInitialMovement(
+      assetId,
+      holder ? holder.id : null,
+      status,
+      'Carga inicial (planilha legada)',
+      null,
+      responsibleUserId
+    );
+    assets++;
+  });
 
   const ticketRows = tableObjects(sheetRows(workbook, ['registros']), [
     'Nº CHAMADO',
     'SOLICITANTE'
   ]);
-  for (const row of ticketRows) {
+  ticketRows.forEach((row, index) => {
     const employee = repository.findEmployeeByName(col(row, 'SOLICITANTE'));
     if (!employee) {
       skipped++;
-      continue;
+      return;
     }
     const equipment = col(row, 'Nº DO EQUIPAMENTO') || '__none__';
-    const assetId = repository.findLegacyAsset(equipment)?.id || null;
+    const asset = repository.findLegacyAsset(equipment);
+    if (
+      !policy.inScope({
+        city: employee.city,
+        department: employee.department,
+        equipment_type: asset ? asset.equipment_type : null
+      })
+    ) {
+      throw new ValidationError(`registros, linha ${index + 2}: chamado fora do seu alcance.`);
+    }
     repository.insertLegacyTicket({
       ticketNumber: col(row, 'Nº CHAMADO'),
       employeeId: employee.id,
-      assetId,
+      assetId: asset ? asset.id : null,
       type: col(row, 'TIPO DE CHAMADO'),
       priority: col(row, 'PRIORIDADE'),
       description: col(row, 'DESCRIÇÃO') || 'Importado',
@@ -140,7 +197,7 @@ function importLegacy(repository, workbook, responsibleUserId) {
       responsibleUserId
     });
     tickets++;
-  }
+  });
 
   return {
     employees,

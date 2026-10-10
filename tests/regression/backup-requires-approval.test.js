@@ -304,9 +304,8 @@ test('importação não move um ativo existente de BACKUP para EM_USO', async (t
   );
   const legacyFile = path.join(directory, 'legado.xlsx');
   XLSX.writeFile(legacy, legacyFile);
-  const legacyImport = await s.technicianSession
-    .post('/api/import/excel')
-    .attach('file', legacyFile);
+  // A planilha legada é carga inicial (import:initial_load, só ADMIN por padrão).
+  const legacyImport = await s.adminSession.post('/api/import/excel').attach('file', legacyFile);
   assert.equal(legacyImport.status, 200, JSON.stringify(legacyImport.body));
 
   assert.equal(s.status(backup), BACKUP);

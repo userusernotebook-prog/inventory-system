@@ -92,6 +92,10 @@ Desativar um usuario, redefinir a senha, trocar o perfil ou alterar permissoes o
 
 Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra contas por perfil e status, cria e edita usuarios, ativa/desativa contas, redefine senhas provisorias e encerra sessoes. A tela de cada usuario mostra overrides em tres estados (herdar, permitir e negar), a origem da permissao efetiva, alcance por cidade/departamento/tipo de equipamento e uma pre-visualizacao antes do salvamento. Alteracoes administrativas exigem motivo e sao registradas na auditoria.
 
+## Importacao
+
+A importacao (`asset:create`) respeita permissoes e alcance de quem importa. Sem `import:initial_load` (so ADMIN por padrao, concedivel individualmente) entram apenas ativos `DISPONIVEL` ou `BACKUP`, sem atribuicao. Com ela, a carga inicial pode criar ativos ja `EM_USO`, `DESATIVADO`, `EM_MANUTENCAO` ou `EM_AVALIACAO`; `PENDENTE_DEVOLUCAO` nunca e importado. Todo ativo importado recebe uma movimentacao `CARGA_INICIAL` com o autor. Criar funcionarios pela planilha exige `employee:create`. A planilha legada e uma carga inicial: exige `import:initial_load`, registra `CARGA_INICIAL` ao atribuir e coloca em `BACKUP` (nunca `DISPONIVEL`) o equipamento legado sem dono.
+
 ## Fluxo de aprovacoes
 
 1. Um usuario com `request:create` abre uma solicitacao com justificativa e ativos.

@@ -17,7 +17,9 @@ const MOVEMENT_TYPES = Object.freeze({
   SEND_TO_BACKUP: 'ENVIO_BACKUP',
   DEACTIVATION: 'DESATIVACAO',
   RETURN_PENDING: 'PENDENCIA_DEVOLUCAO',
-  EVALUATION: 'AVALIACAO'
+  EVALUATION: 'AVALIACAO',
+  // Registro do estado de um ativo trazido por importação (com o autor da carga).
+  INITIAL_LOAD: 'CARGA_INICIAL'
 });
 
 class AssetStateTransitionError extends Error {

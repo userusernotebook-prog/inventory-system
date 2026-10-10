@@ -19,11 +19,11 @@ function workbook({ code, invalid = false }) {
   const source = XLSX.readFile(path.join(projectDir, 'public', 'modelo-importacao-inicial.xlsx'));
   const people = source.Sheets.Funcionarios;
   const assets = source.Sheets.Ativos;
-  Object.assign(people, {
-    A2: { t: 's', v: code }, B2: { t: 's', v: 'Pessoa importada pela interface' }, J2: { t: 's', v: 'Ativo' }, '!ref': 'A1:L2'
-  });
+  // Técnico não tem import:initial_load nem employee:create: a planilha válida traz
+  // só um ativo em BACKUP; a inválida, um DESATIVADO (exige carga inicial) na linha 2.
+  Object.assign(people, { '!ref': 'A1:L1' });
   Object.assign(assets, {
-    A2: { t: 's', v: '' }, B2: { t: 's', v: 'Notebook' }, F2: { t: 's', v: `SERIAL-${code}` }, G2: { t: 's', v: `REF-${code}` }, O2: { t: 's', v: 'Desativado' }, P2: { t: 's', v: invalid ? '' : 'Sem reparo' }, Q1: { t: 's', v: 'LAUDO TÉCNICO' }, Q2: { t: 's', v: invalid ? '' : 'Laudo técnico de teste.' }, '!ref': 'A1:Q2'
+    A2: { t: 's', v: '' }, B2: { t: 's', v: 'Notebook' }, F2: { t: 's', v: `SERIAL-${code}` }, G2: { t: 's', v: `REF-${code}` }, O2: { t: 's', v: invalid ? 'Desativado' : 'Backup' }, P2: { t: 's', v: invalid ? 'Sem reparo' : '' }, Q1: { t: 's', v: 'LAUDO TÉCNICO' }, Q2: { t: 's', v: invalid ? 'Laudo técnico de teste.' : '' }, '!ref': 'A1:Q2'
   });
   return XLSX.write(source, { type: 'buffer', bookType: 'xlsx' });
 }

@@ -144,6 +144,9 @@ function createAuthService(repository, auditService) {
     scopes(user) {
       return scopesOf(user);
     },
+    inScope(user, resource) {
+      return isInScope(user, resource);
+    },
     assertScope(user, resource) {
       if (!isInScope(user, resource)) {
         throw new ForbiddenError('Seu alcance não permite acessar este registro.');

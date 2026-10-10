@@ -45,11 +45,18 @@ function validationError(error) {
   };
 }
 
-function createImportsService(db, repository, auditService) {
-  const execute = (workbook, isTemplate, userId) =>
+function createImportsService(db, repository, auditService, authService) {
+  // O que a importação pode criar depende de quem importa: carga inicial
+  // (EM_USO/DESATIVADO e planilha legada), funcionários e alcance.
+  const policyFor = (user) => ({
+    initialLoad: authService.can(user, 'import:initial_load'),
+    createEmployees: authService.can(user, 'employee:create'),
+    inScope: (resource) => authService.inScope(user, resource)
+  });
+  const execute = (workbook, isTemplate, user) =>
     isTemplate
-      ? importTemplate(repository, workbook, userId)
-      : importLegacy(repository, workbook, userId);
+      ? importTemplate(repository, workbook, user.id, policyFor(user))
+      : importLegacy(repository, workbook, user.id, policyFor(user));
 
   return {
     importExcel(file, user) {
@@ -59,7 +66,7 @@ function createImportsService(db, repository, auditService) {
         const classified = readAndClassify(file);
         isTemplate = classified.isTemplate;
         return db.transaction(() => {
-          const result = execute(classified.workbook, isTemplate, user.id);
+          const result = execute(classified.workbook, isTemplate, user);
           const details = {
             employees: result.employees,
             assets: result.assets,
@@ -90,7 +97,7 @@ function createImportsService(db, repository, auditService) {
         const format = isTemplate ? 'MODELO_INICIAL' : 'LEGADO';
         try {
           db.transaction(() => {
-            const result = execute(classified.workbook, isTemplate, user.id);
+            const result = execute(classified.workbook, isTemplate, user);
             // Deliberately aborts the transaction: preview never persists data.
             throw new PreviewComplete(result);
           })();

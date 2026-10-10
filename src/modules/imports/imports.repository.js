@@ -2,7 +2,7 @@ function createImportsRepository(db) {
   return {
     employeesByCode(code) {
       return db
-        .prepare('SELECT id,name,status FROM employees WHERE code=? COLLATE NOCASE')
+        .prepare('SELECT id,name,status,city,department FROM employees WHERE code=? COLLATE NOCASE')
         .all(code);
     },
     insertTemplateEmployee(input) {
@@ -70,12 +70,13 @@ function createImportsRepository(db) {
         'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
       ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
     },
+    // Carga inicial: o ativo nasce no estado importado, sem estado anterior.
     insertInitialMovement(assetId, employeeId, status, reason, technicalReport, responsibleUserId) {
       db.prepare(
         `INSERT INTO movements
         (asset_id,employee_to_id,from_status,to_status,movement_type,reason,
         responsible_user_id,technical_report,occurred_at,created_at)
-        VALUES(?,?, 'DISPONIVEL',?,'IMPORTACAO_INICIAL',?,?,?,?,?)`
+        VALUES(?,?,NULL,?,'CARGA_INICIAL',?,?,?,?,?)`
       ).run(
         assetId,
         employeeId,
@@ -88,7 +89,9 @@ function createImportsRepository(db) {
       );
     },
     findEmployeeByName(name) {
-      return db.prepare('SELECT id FROM employees WHERE name=? COLLATE NOCASE').get(name);
+      return db
+        .prepare('SELECT id,status,city,department FROM employees WHERE name=? COLLATE NOCASE')
+        .get(name);
     },
     insertLegacyEmployee(code, name, city, department) {
       return db
@@ -111,7 +114,7 @@ function createImportsRepository(db) {
           `INSERT INTO assets
           (hostname,equipment_type,manufacturer,model,serial,description,imei1,imei2,
           apple_id,reference,condition_text,city,location,activated_at,replaced_at,status,created_at,updated_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DISPONIVEL',?,?)`
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           input.hostname,
@@ -129,21 +132,15 @@ function createImportsRepository(db) {
           input.location,
           input.activatedAt,
           input.replacedAt,
+          input.status,
           new Date().toISOString(),
           new Date().toISOString()
         ).lastInsertRowid;
     },
-    assignLegacyAsset(assetId, employeeId, responsibleUserId) {
-      db.prepare(
-        'INSERT INTO assignments(asset_id,employee_id,responsible_user_id,assigned_at) VALUES(?,?,?,?)'
-      ).run(assetId, employeeId, responsibleUserId, new Date().toISOString());
-      db.prepare("UPDATE assets SET status='EM_USO',updated_at=? WHERE id=?").run(
-        new Date().toISOString(),
-        assetId
-      );
-    },
     findLegacyAsset(value) {
-      return db.prepare('SELECT id FROM assets WHERE serial=? OR hostname=?').get(value, value);
+      return db
+        .prepare('SELECT id,equipment_type FROM assets WHERE serial=? OR hostname=?')
+        .get(value, value);
     },
     insertLegacyTicket(input) {
       db.prepare(
