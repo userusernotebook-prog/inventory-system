@@ -98,7 +98,7 @@ Na tela **Usuarios**, visivel somente para `user:manage`, o administrador filtra
 2. O ativo fica reservado enquanto a solicitacao estiver `PENDENTE`: qualquer mudanca de estado por outra rota (`/move`, desligamento, destino) e recusada com 409 "Ativo reservado pela solicitacao #N". So a execucao da propria solicitacao move o ativo; rejeicao, cancelamento ou expiracao liberam a reserva.
 3. Somente `request:approve` aprova ou rejeita. O administrador pode autoaprovar, e isso e auditado.
 4. A aprovacao revalida o estado e executa a movimentacao na mesma transacao.
-5. Troca movimenta o ativo antigo para avaliacao e atribui o novo; backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.
+5. Troca movimenta o ativo antigo para avaliacao e atribui o novo. Na criacao e na aprovacao, o ativo antigo precisa estar `EM_USO` e atribuido exatamente ao funcionario da solicitacao; o novo pode estar em `DISPONIVEL` ou `BACKUP` (neste caso, a aprovacao da propria troca atende a regra de backup); backup em uso exige aprovacao; desativacao exige laudo e e irreversivel.
 
 `DISPONIVEL` e somente estoque novo, nunca usado: o ativo so entra nesse estado no cadastro, e atribuir um ativo `DISPONIVEL` nao exige aprovacao. Equipamento devolvido, avaliado ou reparado volta para `BACKUP`, nunca para `DISPONIVEL`. De `BACKUP` para `EM_USO` nao ha atalho: nem por `/move` em dois passos, nem por importacao, troca ou desligamento; o unico caminho e uma solicitacao aprovada. A migration 013 move para `BACKUP` os ativos ja usados que estavam em `DISPONIVEL` pela regra antiga. 6. Eventos de criacao, decisao, execucao, cancelamento e expiracao sao imutaveis.
 

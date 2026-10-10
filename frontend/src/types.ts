@@ -44,6 +44,7 @@ export type Employee = {
 };
 export type Asset = {
   id: number;
+  employee_id?: number | null;
   hostname?: string;
   equipment_type: string;
   model?: string;

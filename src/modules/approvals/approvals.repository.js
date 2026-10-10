@@ -31,6 +31,13 @@ function createApprovalsRepository(db) {
         .prepare('SELECT request_id FROM approval_asset_reservations WHERE asset_id=?')
         .get(assetId);
     },
+    currentHolder(assetId) {
+      return (
+        db
+          .prepare('SELECT employee_id FROM assignments WHERE asset_id=? AND returned_at IS NULL')
+          .get(assetId)?.employee_id ?? null
+      );
+    },
     release(requestId) {
       db.prepare('DELETE FROM approval_asset_reservations WHERE request_id=?').run(requestId);
     },

@@ -57,9 +57,25 @@ function createApprovalsService(
       if (input.old_asset_id === input.new_asset_id) {
         throw new ValidationError('Os ativos da troca devem ser diferentes.');
       }
+      const oldAsset = assetsRepository.findById(input.old_asset_id);
+      if (
+        !oldAsset ||
+        oldAsset.status !== ASSET_STATES.IN_USE ||
+        repository.currentHolder(input.old_asset_id) !== employeeId
+      ) {
+        throw new ValidationError(
+          'O ativo antigo não está em uso pelo funcionário da solicitação.'
+        );
+      }
+      // O novo pode ser estoque novo ou BACKUP; em BACKUP, a aprovação desta
+      // mesma solicitação é a aprovação exigida pela regra R1.
+      const newAsset = assetsRepository.findById(input.new_asset_id);
+      if (!newAsset || ![ASSET_STATES.AVAILABLE, ASSET_STATES.BACKUP].includes(newAsset.status)) {
+        throw new ValidationError('O ativo novo deve estar em DISPONIVEL ou BACKUP.');
+      }
       return [
         { assetId: input.old_asset_id, role: 'OLD', expectedStatus: ASSET_STATES.IN_USE },
-        { assetId: input.new_asset_id, role: 'NEW', expectedStatus: ASSET_STATES.BACKUP }
+        { assetId: input.new_asset_id, role: 'NEW', expectedStatus: newAsset.status }
       ];
     }
     if (!input.asset_id) throw new ValidationError('Informe o ativo da solicitação.');
@@ -115,6 +131,9 @@ function createApprovalsService(
     const options = { approvedRequestId: request.id };
     const results = [];
     if (request.type === TYPES.EXCHANGE) {
+      if (repository.currentHolder(byRole.OLD.asset_id) !== request.employee_id) {
+        throw new ConflictError('O ativo antigo não está mais com o funcionário da solicitação.');
+      }
       results.push(
         movementsService.performMove(
           byRole.OLD.asset_id,
