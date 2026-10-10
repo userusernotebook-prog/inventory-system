@@ -18,6 +18,7 @@ test('RH cadastra funcionario, tecnico cadastra e atribui ativo, consulta apenas
   await login(page, 'rh.e2e@example.test');
   await page.getByRole('link', { name: 'Funcionarios' }).click();
   await page.getByRole('link', { name: 'Novo funcionario' }).click();
+  await expect(page.getByRole('heading', { name: 'Novo funcionario' })).toBeVisible();
   await page.getByLabel('Nome').fill(employeeName);
   await page.getByLabel('E-mail').fill(employeeEmail);
   await page.getByLabel('Departamento').fill('Tecnologia');
@@ -30,6 +31,7 @@ test('RH cadastra funcionario, tecnico cadastra e atribui ativo, consulta apenas
   await login(page, 'tecnico.e2e@example.test');
   await page.getByRole('link', { name: 'Ativos' }).click();
   await page.getByRole('link', { name: 'Novo ativo' }).click();
+  await expect(page.getByRole('heading', { name: 'Novo ativo' })).toBeVisible();
   await page.getByLabel('Tipo de equipamento').fill('Notebook');
   await page.getByLabel('Hostname').fill(assetName);
   await page.getByLabel('Serial').fill(`SERIAL-${stamp}`);

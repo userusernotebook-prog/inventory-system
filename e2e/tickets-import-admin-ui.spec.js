@@ -32,6 +32,7 @@ test('tecnico abre chamado, vê os equipamentos do funcionário e fecha com pare
   await login(page, 'tecnico.e2e@example.test');
   await page.getByRole('link', { name: 'Chamados' }).click();
   await page.getByRole('link', { name: 'Abrir chamado' }).click();
+  await expect(page.getByRole('heading', { name: 'Abrir chamado' })).toBeVisible();
   await page.getByLabel('Funcionário do chamado').selectOption({ label: 'Pessoa Chamados Interface E2E' });
   await expect(page.getByLabel('Equipamento do chamado')).toContainText('ticket-ui-e2e');
   const assetOption = page.getByLabel('Equipamento do chamado').locator('option').filter({ hasText: 'ticket-ui-e2e' });

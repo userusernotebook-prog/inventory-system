@@ -14,6 +14,7 @@ test('tecnico solicita uso de backup e admin aprova pela interface', async ({ pa
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await page.getByRole('link', { name: 'Minhas solicitacoes' }).click();
   await page.getByRole('link', { name: 'Nova solicitacao' }).click();
+  await expect(page.getByRole('heading', { name: 'Nova solicitacao' })).toBeVisible();
   await page.getByLabel('Tipo').selectOption('USO_EQUIPAMENTO_BACKUP');
   await page.getByLabel('Funcionario').selectOption({ label: 'Pessoa Aprovacao E2E' });
   const backupOption = page

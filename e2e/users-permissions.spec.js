@@ -23,6 +23,7 @@ test('admin cria tecnico, nega permissao e o tecnico nao ve a acao pela interfac
   await page.getByRole('link', { name: 'Usuarios' }).click();
   await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
   await page.getByRole('link', { name: 'Cadastrar usuario' }).click();
+  await expect(page.getByRole('heading', { name: 'Cadastrar usuario' })).toBeVisible();
   await page.getByLabel('Nome').fill('Tecnico com ativos negados');
   await page.getByLabel('E-mail').fill(technicianEmail);
   await page.getByLabel('Perfil').selectOption('TECNICO');
