@@ -18,12 +18,22 @@ test('somente administrador consulta o ultimo backup bem-sucedido', async () => 
     context.db
       .prepare('UPDATE users SET totp_secret=?,totp_enabled=1 WHERE id=?')
       .run(totpSecret, admin.id);
-    const signedIn = await login(
+    let signedIn = await login(
       context.agent,
       admin.email,
       password,
       await generate({ secret: totpSecret })
     );
+    // Evita o limite de virada do intervalo TOTP entre gerar o código e a
+    // requisição: a aplicação continua aceitando apenas o código corrente.
+    if (signedIn.status === 401) {
+      signedIn = await login(
+        context.agent,
+        admin.email,
+        password,
+        await generate({ secret: totpSecret })
+      );
+    }
     assert.equal(signedIn.status, 200);
 
     const response = await context.agent.get('/api/admin/backup-status');

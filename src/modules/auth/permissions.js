@@ -25,7 +25,6 @@ const PERMISSIONS = Object.freeze([
   'request:approve',
   'user:manage',
   'audit:read',
-  'report:financial',
   // Carga inicial: importar ativos já EM_USO/DESATIVADO e a planilha legada.
   'import:initial_load'
 ]);

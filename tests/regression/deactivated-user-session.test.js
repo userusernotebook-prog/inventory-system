@@ -150,7 +150,7 @@ test('falha no meio da alteração não deixa permissões parciais nem revoga se
     ],
     reason
   });
-  assert.equal(failed.status, 409, JSON.stringify(failed.body));
+  assert.equal(failed.status, 400, JSON.stringify(failed.body));
   assert.deepEqual(
     s.db
       .prepare('SELECT permission,effect FROM user_permission_overrides WHERE user_id=?')

@@ -153,7 +153,7 @@ function createAuthRepository(db) {
       for (const field of ['profile_base', 'active']) {
         if (options[field] !== undefined) {
           where.push(`${field}=?`);
-          params.push(options[field]);
+          params.push(field === 'active' ? Number(options[field]) : options[field]);
         }
       }
       const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';

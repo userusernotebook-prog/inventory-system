@@ -1,4 +1,4 @@
-const { ForbiddenError, NotFoundError, ValidationError } = require('../../shared/errors');
+const { ConflictError, ForbiddenError, NotFoundError, ValidationError } = require('../../shared/errors');
 const { text, optionalDate } = require('../../shared/utils/text');
 const { pageResult } = require('../../shared/utils/query');
 
@@ -72,6 +72,9 @@ function createEmployeesService(db, repository, auditService, authService) {
       const current = repository.findById(id);
       if (!current) throw new NotFoundError('Funcionário não encontrado.');
       authService.assertScope(user, current);
+      if (['em_desligamento', 'desligado'].includes(current.status)) {
+        throw new ConflictError('Funcionário em processo de desligamento: dados bloqueados');
+      }
       if (body.status !== undefined && body.status !== current.status) {
         throw new ValidationError('Altere o status pelo fluxo de desligamento.');
       }

@@ -266,7 +266,12 @@ function createAuthService(repository, auditService) {
       if (target.profile_base === 'ADMIN') {
         throw new ForbiddenError('As permissões do administrador não podem ser alteradas.');
       }
+      const seen = new Set();
       for (const row of rows) {
+        if (seen.has(row.permission)) {
+          throw new ValidationError(`Permissão repetida: ${row.permission}.`);
+        }
+        seen.add(row.permission);
         if (!isKnownPermission(row.permission)) {
           throw new ValidationError(`Permissão desconhecida: ${row.permission}.`);
         }
@@ -286,6 +291,12 @@ function createAuthService(repository, auditService) {
       if (!target) throw new ValidationError('Usuário não encontrado.');
       if (target.profile_base === 'ADMIN') {
         throw new ForbiddenError('O alcance do administrador não pode ser restringido.');
+      }
+      const seen = new Set();
+      for (const row of rows) {
+        const key = `${row.type}:${String(row.value).trim().toLowerCase()}`;
+        if (seen.has(key)) throw new ValidationError('Alcance repetido.');
+        seen.add(key);
       }
       repository.transaction(() => {
         repository.setScopes(id, rows);

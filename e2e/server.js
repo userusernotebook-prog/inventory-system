@@ -77,6 +77,9 @@ async function seed(db) {
     "INSERT INTO employees(name, email, status) VALUES('Pessoa Aprovacao E2E', 'aprovacao.e2e@example.test', 'ativo')"
   ).run();
   db.prepare(
+    "INSERT INTO employees(name, email, status) VALUES('Pessoa Bloqueada E2E', 'bloqueada.e2e@example.test', 'em_desligamento')"
+  ).run();
+  db.prepare(
     "INSERT INTO assets(equipment_type, serial, hostname, status) VALUES('Notebook', 'E2E-BACKUP-APPROVAL', 'backup-approval-e2e', 'BACKUP')"
   ).run();
   const uiOffboardingEmployeeId = db

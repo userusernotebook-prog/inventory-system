@@ -13,7 +13,8 @@ const migrationRequirements = new Map([
   [9, [6, 7, 8]],
   [11, [6]],
   [12, [6]],
-  [13, [5, 6]]
+  [13, [5, 6]],
+  [14, [6]]
 ]);
 
 function applyStructuralMigration(db, sql, record) {

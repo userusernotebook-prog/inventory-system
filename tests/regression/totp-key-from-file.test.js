@@ -56,7 +56,10 @@ test('servidor iniciado só com TOTP_ENCRYPTION_KEY_FILE conclui o 2FA do admin'
     password
   });
   assert.equal(login.status, 200, JSON.stringify(login.body));
-  const changed = await client.post('/api/auth/change-password', { password: newPassword });
+  const changed = await client.post('/api/auth/change-password', {
+    password: newPassword,
+    reason: 'Primeira senha definitiva do administrador.'
+  });
   assert.equal(changed.status, 200, JSON.stringify(changed.body));
 
   const setup = await client.post('/api/auth/totp/setup');

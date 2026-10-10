@@ -83,7 +83,7 @@ As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conced
 | `ADMIN`      | Tudo, incluindo auditoria, usuarios e aprovacoes. Ha apenas um administrador. |
 | `TECNICO`    | Le, cadastra e edita ativos; recebe e avalia equipamentos; cria solicitacoes. |
 | `RH`         | Gerencia funcionarios, inicia e conclui desligamentos; cria solicitacoes.     |
-| `FINANCEIRO` | Le ativos com valores e relatorios financeiros; nao altera ativos.            |
+| `FINANCEIRO` | Le ativos com valores; nao altera ativos.                                    |
 | `CONSULTA`   | Somente leitura com mascaramento de dados pessoais.                           |
 
 Todos entram por e-mail e senha. O admin cadastra usuarios com senha provisoria; eles precisam troca-la no primeiro acesso. Sessao usa cookie `httpOnly`, `SameSite=Strict`, `Secure` em producao, expiracao e bloqueio temporario apos tentativas falhas. O header `x-technician-id` nao e aceito.

@@ -66,7 +66,7 @@ function createAuthRoutes(service) {
     '/api/users/:id/reset-password',
     ...manage,
     validate(schema.id, 'params'),
-    validate(schema.password, 'body'),
+    validate(schema.adminPassword, 'body'),
     controller.resetPassword
   );
   router.post(

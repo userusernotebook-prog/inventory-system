@@ -192,9 +192,9 @@ function createApprovalsService(
   }
 
   // R4: somente o ADMIN aprova ou rejeita, mesmo que a permissão apareça de outra forma.
-  function assertAdmin(user) {
+  function assertApprover(user) {
     authService.authorize(user, 'request:approve');
-    if (user.profile_base !== 'ADMIN') {
+    if (!authService.can(user, 'request:approve')) {
       throw new ForbiddenError('Somente o administrador aprova ou rejeita solicitações.');
     }
   }
@@ -241,7 +241,7 @@ function createApprovalsService(
       };
       const result = repository.list(
         { ...values, page, pageSize },
-        user.profile_base === 'ADMIN' ? null : user.id
+        authService.can(user, 'request:approve') ? null : user.id
       );
       return pageResult({ page, pageSize, ...result });
     },
@@ -249,12 +249,12 @@ function createApprovalsService(
       db.transaction(expireDueRequests)();
       const detail = repository.details(id);
       if (!detail) throw new NotFoundError('Solicitação não encontrada.');
-      if (detail.requester_user_id !== user.id && user.profile_base !== 'ADMIN')
+      if (detail.requester_user_id !== user.id && !authService.can(user, 'request:approve'))
         throw new ForbiddenError();
       return authService.can(user, 'employee:read') ? detail : { ...detail, employee_name: null };
     },
     approve(id, approver, reason) {
-      assertAdmin(approver);
+      assertApprover(approver);
       return db.transaction(() => {
         expireDueRequests();
         const request = getPending(id);
@@ -283,7 +283,7 @@ function createApprovalsService(
       })();
     },
     reject(id, reason, approver) {
-      assertAdmin(approver);
+      assertApprover(approver);
       return db.transaction(() => {
         expireDueRequests();
         const request = getPending(id);

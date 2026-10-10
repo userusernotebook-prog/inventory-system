@@ -6,13 +6,21 @@ const { createIntegrationContext, createUser, login } = require('../helpers/inte
 
 const projectDir = path.resolve(__dirname, '..', '..');
 
-function filledWorkbook({ code = 'F001', invalid = false } = {}) {
+function filledWorkbook({
+  code = 'F001',
+  invalid = false,
+  employeeName = 'Pessoa de teste',
+  employeeEmail,
+  assetStatus = 'Em uso',
+  assetEmployeeCode = code
+} = {}) {
   const workbook = XLSX.readFile(path.join(projectDir, 'public', 'modelo-importacao-inicial.xlsx'));
   const people = workbook.Sheets.Funcionarios;
   const assets = workbook.Sheets.Ativos;
   for (const [cell, value] of Object.entries({
     A2: code,
-    B2: 'Pessoa de teste',
+    B2: employeeName,
+    ...(employeeEmail ? { C2: employeeEmail } : {}),
     E2: 'TI',
     J2: 'Ativo'
   })) {
@@ -20,11 +28,11 @@ function filledWorkbook({ code = 'F001', invalid = false } = {}) {
   }
   people['!ref'] = 'A1:L2';
   for (const [cell, value] of Object.entries({
-    A2: code,
+    A2: assetEmployeeCode,
     B2: 'Notebook',
     F2: `SERIAL-${code}-1`,
     G2: `REF-${code}-1`,
-    O2: 'Em uso',
+    O2: assetStatus,
     B3: 'Headset',
     G3: `REF-${code}-2`,
     O3: 'Backup',
@@ -134,6 +142,57 @@ test('a importacao pela API e atomica para o modelo novo e para a planilha legad
     assert.equal(legacy.status, 200, JSON.stringify(legacy.body));
     assert.equal(legacy.body.employees, 1);
     assert.equal(legacy.body.assets, 1);
+  } finally {
+    context.close();
+  }
+});
+
+test('importacao nunca altera funcionario em desligamento ou desligado', async () => {
+  const context = createIntegrationContext();
+  try {
+    const technician = await createUser(context.db, {
+      name: 'Técnico',
+      email: 'tecnico-import-lock@example.test',
+      profile: 'TECNICO'
+    });
+    for (const permission of ['import:initial_load', 'employee:create']) {
+      context.db
+        .prepare('INSERT INTO user_permission_overrides(user_id,permission,effect) VALUES(?,?,?)')
+        .run(technician.id, permission, 'allow');
+    }
+    context.db
+      .prepare(
+        "INSERT INTO employees(code,name,email,corporate_phone,status) VALUES(?,?,?,?, 'desligado')"
+      )
+      .run('LOCK-001', 'Pessoa bloqueada', 'original@example.test', '11999999999');
+    assert.equal((await login(context.agent, technician.email, technician.password)).status, 200);
+
+    const response = await context.agent
+      .post('/api/import/excel')
+      .attach(
+        'file',
+        filledWorkbook({
+          code: 'LOCK-001',
+          employeeName: 'Pessoa bloqueada',
+          employeeEmail: 'alterado@example.test',
+          assetStatus: 'Backup',
+          assetEmployeeCode: ''
+        }),
+        'funcionario-bloqueado.xlsx'
+      );
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.skipped, 1);
+    assert.deepEqual(
+      context.db
+        .prepare('SELECT name,email,corporate_phone,status FROM employees WHERE code=?')
+        .get('LOCK-001'),
+      {
+        name: 'Pessoa bloqueada',
+        email: 'original@example.test',
+        corporate_phone: '11999999999',
+        status: 'desligado'
+      }
+    );
   } finally {
     context.close();
   }

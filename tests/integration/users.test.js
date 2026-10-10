@@ -56,7 +56,8 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       name: 'Pessoa Editada',
       email: 'pessoa.editada@example.test',
       profile_base: 'RH',
-      active: true
+      active: true,
+      reason: 'Atualizacao cadastral aprovada.'
     });
     assert.equal(edited.status, 200, JSON.stringify(edited.body));
     const updated = context.db.prepare('SELECT * FROM users WHERE id=?').get(userId);
@@ -68,7 +69,8 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       name: 'Pessoa Editada',
       email: 'pessoa.editada@example.test',
       profile_base: 'RH',
-      active: false
+      active: false,
+      reason: 'Desativacao administrativa aprovada.'
     });
     assert.equal(deactivated.status, 200, JSON.stringify(deactivated.body));
     assert.equal(context.db.prepare('SELECT active FROM users WHERE id=?').get(userId).active, 0);
@@ -77,13 +79,14 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       name: 'Pessoa Editada',
       email: 'pessoa.editada@example.test',
       profile_base: 'RH',
-      active: true
+      active: true,
+      reason: 'Reativacao administrativa aprovada.'
     });
     assert.equal(activated.status, 200, JSON.stringify(activated.body));
 
     const reset = await context.agent
       .post(`/api/users/${userId}/reset-password`)
-      .send({ password: 'SenhaRedefinidaForte1' });
+      .send({ password: 'SenhaRedefinidaForte1', reason: 'Redefinicao de senha solicitada.' });
     assert.equal(reset.status, 200, JSON.stringify(reset.body));
     assert.equal(
       context.db.prepare('SELECT must_change_password FROM users WHERE id=?').get(userId)
@@ -119,6 +122,7 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
 
     const scopes = await context.agent.put(`/api/users/${userId}/scopes`).send({
       scopes: [{ type: 'city', value: 'São Paulo' }]
+      ,reason: 'Alcance operacional definido.'
     });
     assert.equal(scopes.status, 200, JSON.stringify(scopes.body));
     assert.deepEqual(
