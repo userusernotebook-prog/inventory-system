@@ -19,6 +19,13 @@ function createTicketsRoutes(service, authService) {
     validate(schema.body, 'body'),
     controller.create
   );
+  router.post(
+    '/api/tickets/:id/close',
+    ...requirePermission(authService, 'ticket:close'),
+    validate(schema.params, 'params'),
+    validate(schema.close, 'body'),
+    controller.close
+  );
   return router;
 }
 

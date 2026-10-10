@@ -11,6 +11,9 @@ function createImportsController(service) {
     },
     importExcel(req, res) {
       res.json(service.importExcel(req.validated.file, req.user));
+    },
+    previewExcel(req, res) {
+      res.json(service.previewExcel(req.validated.file, req.user));
     }
   };
 }

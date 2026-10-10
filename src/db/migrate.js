@@ -11,7 +11,8 @@ const legacyColumns = new Map([
 const structuralMigrations = new Set([5, 6, 8]);
 const migrationRequirements = new Map([
   [9, [6, 7, 8]],
-  [11, [6]]
+  [11, [6]],
+  [12, [6]]
 ]);
 
 function applyStructuralMigration(db, sql, record) {

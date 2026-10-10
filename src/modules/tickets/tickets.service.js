@@ -1,4 +1,4 @@
-const { ValidationError } = require('../../shared/errors');
+const { ConflictError, NotFoundError, ValidationError } = require('../../shared/errors');
 const { text } = require('../../shared/utils/text');
 const { pageResult } = require('../../shared/utils/query');
 
@@ -30,6 +30,22 @@ function createTicketsService(db, repository, auditService, employeesRepository,
           after: { employee_id: Number(body.employee_id), asset_id: Number(body.asset_id) || null }
         });
         return { id, ticket_number: ticketNumber };
+      })();
+    },
+    close(id, body, technician) {
+      const ticket = repository.findById(Number(id));
+      if (!ticket) throw new NotFoundError('Chamado não encontrado.');
+      authService.assertScope(technician, ticket);
+      if (ticket.status === 'closed') {
+        throw new ConflictError('Este chamado já foi encerrado.');
+      }
+      return db.transaction(() => {
+        repository.close(ticket.id, text(body.technical_opinion), technician.id);
+        auditService.logUser(technician, 'close', 'ticket', ticket.id, {
+          before: { status: ticket.status },
+          after: { status: 'closed', technical_opinion: text(body.technical_opinion) }
+        });
+        return { id: ticket.id, status: 'closed' };
       })();
     }
   };

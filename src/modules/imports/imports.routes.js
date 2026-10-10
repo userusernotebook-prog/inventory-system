@@ -26,6 +26,13 @@ function createImportsRoutes(service, authService) {
     controller.downloadTemplate
   );
   router.post(
+    '/api/import/excel/preview',
+    ...requirePermission(authService, 'asset:create'),
+    upload.single('file'),
+    validate(schema.file, 'file'),
+    controller.previewExcel
+  );
+  router.post(
     '/api/import/excel',
     ...requirePermission(authService, 'asset:create'),
     upload.single('file'),

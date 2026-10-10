@@ -76,6 +76,23 @@ test('a importacao pela API e atomica para o modelo novo e para a planilha legad
     assert.equal(template.status, 200);
     assert.match(template.headers['content-disposition'], /modelo-importacao-inicial/);
 
+    const preview = await context.agent
+      .post('/api/import/excel/preview')
+      .attach('file', filledWorkbook({ code: 'PREVIEW-1' }), 'preview.xlsx');
+    assert.equal(preview.status, 200, JSON.stringify(preview.body));
+    assert.equal(preview.body.valid, true);
+    assert.equal(preview.body.summary.assets, 3);
+    assert.equal((await context.agent.get('/api/assets')).body.total, 0);
+
+    const invalidPreview = await context.agent
+      .post('/api/import/excel/preview')
+      .attach('file', filledWorkbook({ code: 'PREVIEW-2', invalid: true }), 'preview-invalido.xlsx');
+    assert.equal(invalidPreview.status, 200, JSON.stringify(invalidPreview.body));
+    assert.equal(invalidPreview.body.valid, false);
+    assert.equal(invalidPreview.body.errors[0].sheet, 'Ativos');
+    assert.equal(invalidPreview.body.errors[0].line, 4);
+    assert.equal((await context.agent.get('/api/employees')).body.total, 0);
+
     const imported = await context.agent
       .post('/api/import/excel')
       .attach('file', filledWorkbook(), 'modelo.xlsx');

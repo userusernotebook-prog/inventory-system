@@ -67,6 +67,23 @@ function createTicketsRepository(db) {
           now,
           now
         ).lastInsertRowid;
+    },
+    findById(id) {
+      return db
+        .prepare(
+          `SELECT tk.*, e.name employee_name, e.city, e.department
+           FROM tickets tk JOIN employees e ON e.id=tk.employee_id
+           WHERE tk.id=?`
+        )
+        .get(id);
+    },
+    close(id, technicalOpinion, responsibleUserId) {
+      const now = new Date().toISOString();
+      db.prepare(
+        `UPDATE tickets
+         SET status='closed', technical_opinion=?, responsible_user_id=?, closed_at=?, updated_at=?
+         WHERE id=?`
+      ).run(technicalOpinion, responsibleUserId, now, now, id);
     }
   };
 }

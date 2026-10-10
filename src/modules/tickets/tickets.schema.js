@@ -19,4 +19,11 @@ const body = z
   })
   .strict();
 
-module.exports = { list, body };
+const params = z.object({ id: z.coerce.number().int().positive() });
+const close = z
+  .object({
+    technical_opinion: z.string().trim().min(3).max(4000)
+  })
+  .strict();
+
+module.exports = { list, body, params, close };

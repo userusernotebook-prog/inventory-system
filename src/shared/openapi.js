@@ -109,6 +109,9 @@ function buildOpenApi() {
         get: operation('ticket:read', 'Lista chamados', { parameters: paginationParameters }),
         post: operation('ticket:create', 'Cria chamado')
       },
+      '/api/tickets/{id}/close': {
+        post: operation('ticket:close', 'Encerra chamado com parecer técnico', { parameters: identifier })
+      },
       '/api/approval-requests': {
         get: operation('request:create', 'Lista solicitações', {
           parameters: paginationParameters
@@ -165,7 +168,10 @@ function buildOpenApi() {
         get: operation('user:manage', 'Consulta permissões efetivas', { parameters: identifier })
       },
       '/api/templates/initial': { get: operation('asset:create', 'Baixa o modelo de importação') },
-      '/api/import/excel': { post: operation('asset:create', 'Importa planilha') }
+      '/api/import/excel': { post: operation('asset:create', 'Importa planilha') },
+      '/api/import/excel/preview': {
+        post: operation('asset:create', 'Pré-valida planilha sem gravar dados')
+      }
     },
     components: {
       securitySchemes: { sessionCookie: { type: 'apiKey', in: 'cookie', name: 'session' } },
