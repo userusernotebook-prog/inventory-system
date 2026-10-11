@@ -28,7 +28,9 @@ function readAndClassify(file) {
     throw new ValidationError('Não foi possível ler o Excel. Verifique a estrutura.');
   }
   if (workbook.SheetNames.some((name) => norm(name) === 'SENHAS')) {
-    throw new ValidationError('A planilha contém uma aba de senhas. Use uma cópia sem credenciais.');
+    throw new ValidationError(
+      'A planilha contém uma aba de senhas. Use uma cópia sem credenciais.'
+    );
   }
   const isTemplate = workbook.SheetNames.some((name) =>
     ['FUNCIONARIOS', 'ATIVOS'].includes(norm(name))
@@ -80,7 +82,10 @@ function createImportsService(db, repository, auditService, authService) {
       } catch (error) {
         if (error instanceof DomainError) throw error;
         console.error(
-          JSON.stringify({ level: 'warn', event: isTemplate ? 'template_import_failed' : 'legacy_import_failed' })
+          JSON.stringify({
+            level: 'warn',
+            event: isTemplate ? 'template_import_failed' : 'legacy_import_failed'
+          })
         );
         throw new ValidationError('Não foi possível importar o Excel. Verifique a estrutura.');
       } finally {
@@ -113,7 +118,10 @@ function createImportsService(db, repository, auditService, authService) {
       } catch (error) {
         if (error instanceof DomainError) throw error;
         console.error(
-          JSON.stringify({ level: 'warn', event: isTemplate ? 'template_preview_failed' : 'legacy_preview_failed' })
+          JSON.stringify({
+            level: 'warn',
+            event: isTemplate ? 'template_preview_failed' : 'legacy_preview_failed'
+          })
         );
         throw new ValidationError('Não foi possível validar o Excel. Verifique a estrutura.');
       } finally {

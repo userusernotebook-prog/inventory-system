@@ -14,5 +14,8 @@ test('cifra segredo TOTP com AES-256-GCM e nonce unico', () => {
 test('recusa chave ausente ou invalida e mantem compatibilidade de leitura para migracao', () => {
   assert.throws(() => encryptTotpSecret('segredo', ''), /TOTP_ENCRYPTION_KEY/);
   assert.throws(() => encryptTotpSecret('segredo', 'curta'), /32 bytes/);
-  assert.equal(decryptTotpSecret('JBSWY3DPEHPK3PXPJ', Buffer.alloc(32, 1).toString('base64')), 'JBSWY3DPEHPK3PXPJ');
+  assert.equal(
+    decryptTotpSecret('JBSWY3DPEHPK3PXPJ', Buffer.alloc(32, 1).toString('base64')),
+    'JBSWY3DPEHPK3PXPJ'
+  );
 });

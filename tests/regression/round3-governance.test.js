@@ -120,8 +120,7 @@ test('R3: anonimizacao inclui desligado sem e-mail', () => {
         .prepare(
           "INSERT INTO employees(name,email,status,offboarded_at,city,code) VALUES(?,NULL,'desligado',?,?,?)"
         )
-        .run('Pessoa sem email', '2020-01-01T00:00:00.000Z', 'São Paulo', 'LEG-001')
-        .lastInsertRowid
+        .run('Pessoa sem email', '2020-01-01T00:00:00.000Z', 'São Paulo', 'LEG-001').lastInsertRowid
     );
     assert.equal(anonymizeOffboardedEmployees(db, 30, new Date('2026-01-01T00:00:00.000Z')), 1);
     const employee = db.prepare('SELECT name,email,city,code FROM employees WHERE id=?').get(id);

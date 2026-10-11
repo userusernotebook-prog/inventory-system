@@ -101,7 +101,11 @@ test('a importacao pela API e atomica para o modelo novo e para a planilha legad
 
     const invalidPreview = await context.agent
       .post('/api/import/excel/preview')
-      .attach('file', filledWorkbook({ code: 'PREVIEW-2', invalid: true }), 'preview-invalido.xlsx');
+      .attach(
+        'file',
+        filledWorkbook({ code: 'PREVIEW-2', invalid: true }),
+        'preview-invalido.xlsx'
+      );
     assert.equal(invalidPreview.status, 200, JSON.stringify(invalidPreview.body));
     assert.equal(invalidPreview.body.valid, false);
     assert.equal(invalidPreview.body.errors[0].sheet, 'Ativos');
@@ -167,19 +171,17 @@ test('importacao nunca altera funcionario em desligamento ou desligado', async (
       .run('LOCK-001', 'Pessoa bloqueada', 'original@example.test', '11999999999');
     assert.equal((await login(context.agent, technician.email, technician.password)).status, 200);
 
-    const response = await context.agent
-      .post('/api/import/excel')
-      .attach(
-        'file',
-        filledWorkbook({
-          code: 'LOCK-001',
-          employeeName: 'Pessoa bloqueada',
-          employeeEmail: 'alterado@example.test',
-          assetStatus: 'Backup',
-          assetEmployeeCode: ''
-        }),
-        'funcionario-bloqueado.xlsx'
-      );
+    const response = await context.agent.post('/api/import/excel').attach(
+      'file',
+      filledWorkbook({
+        code: 'LOCK-001',
+        employeeName: 'Pessoa bloqueada',
+        employeeEmail: 'alterado@example.test',
+        assetStatus: 'Backup',
+        assetEmployeeCode: ''
+      }),
+      'funcionario-bloqueado.xlsx'
+    );
     assert.equal(response.status, 200, JSON.stringify(response.body));
     assert.equal(response.body.skipped, 1);
     assert.deepEqual(

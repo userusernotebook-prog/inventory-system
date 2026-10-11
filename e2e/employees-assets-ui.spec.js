@@ -14,7 +14,9 @@ async function login(page, email) {
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 }
 
-test('RH cadastra funcionario, tecnico cadastra e atribui ativo, consulta apenas visualiza', async ({ page }) => {
+test('RH cadastra funcionario, tecnico cadastra e atribui ativo, consulta apenas visualiza', async ({
+  page
+}) => {
   await login(page, 'rh.e2e@example.test');
   await page.getByRole('link', { name: 'Funcionarios' }).click();
   await page.getByRole('link', { name: 'Novo funcionario' }).click();

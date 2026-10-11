@@ -54,7 +54,8 @@ test('create-admin e reset-admin leem senha somente de fonte segura de automacao
     assert.equal(admin.totp_secret, null);
     assert.equal(admin.totp_enabled, 0);
     assert.match(
-      resetDatabase.prepare('SELECT revoked_at FROM sessions WHERE user_id=?').get(admin.id).revoked_at,
+      resetDatabase.prepare('SELECT revoked_at FROM sessions WHERE user_id=?').get(admin.id)
+        .revoked_at,
       /Z$/
     );
   } finally {

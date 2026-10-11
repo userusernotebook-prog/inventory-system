@@ -20,17 +20,14 @@ function createAuthRoutes(service) {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {
-      const email = String(req.body?.email || '').trim().toLowerCase();
+      const email = String(req.body?.email || '')
+        .trim()
+        .toLowerCase();
       const emailHash = crypto.createHash('sha256').update(email).digest('hex');
       return `${ipKeyGenerator(req.ip)}:${emailHash}`;
     }
   });
-  router.post(
-    '/api/auth/login',
-    loginRateLimit,
-    validate(schema.login, 'body'),
-    controller.login
-  );
+  router.post('/api/auth/login', loginRateLimit, validate(schema.login, 'body'), controller.login);
   router.post('/api/auth/logout', requireAuthentication(service), controller.logout);
   router.get('/api/auth/me', requireAuthentication(service), controller.me);
   router.post(

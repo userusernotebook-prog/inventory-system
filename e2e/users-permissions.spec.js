@@ -34,7 +34,9 @@ test('admin cria tecnico, nega permissao e o tecnico nao ve a acao pela interfac
   await page.getByLabel('Permissao asset:read').selectOption('deny');
   await page.getByRole('button', { name: 'Salvar permissoes' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Salvar permissoes individuais' });
-  await confirmation.getByLabel('Motivo').fill('Restringir consulta de ativos durante treinamento.');
+  await confirmation
+    .getByLabel('Motivo')
+    .fill('Restringir consulta de ativos durante treinamento.');
   await confirmation.getByRole('button', { name: 'Confirmar' }).click();
   await expect(confirmation).toHaveCount(0);
 

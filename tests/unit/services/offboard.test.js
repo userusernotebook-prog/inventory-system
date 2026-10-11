@@ -136,7 +136,10 @@ test('desligamento segue as quatro etapas e bloqueia perfis sem permissão', () 
     );
     const checklist = ctx.offboarding.checklist(ctx.employeeId, ctx.rh);
     assert.equal(checklist.pending, 1);
-    assert.deepEqual(checklist.assets.map((item) => item.id), [Number(ctx.asset)]);
+    assert.deepEqual(
+      checklist.assets.map((item) => item.id),
+      [Number(ctx.asset)]
+    );
     assert.equal(checklist.assets[0].status, ASSET_STATES.RETURN_PENDING);
     assert.deepEqual(
       ctx.offboarding.receive(

@@ -1,4 +1,9 @@
-const { ConflictError, ForbiddenError, NotFoundError, ValidationError } = require('../../shared/errors');
+const {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError
+} = require('../../shared/errors');
 const { text, optionalDate } = require('../../shared/utils/text');
 const { pageResult } = require('../../shared/utils/query');
 

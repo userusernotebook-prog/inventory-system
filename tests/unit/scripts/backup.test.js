@@ -5,11 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 
-const {
-  createBackup,
-  waitForDatabase,
-  writeBackupStatus
-} = require('../../../scripts/backup');
+const { createBackup, waitForDatabase, writeBackupStatus } = require('../../../scripts/backup');
 
 function createTemporaryDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-backup-test-'));
@@ -54,7 +50,9 @@ test('aguarda o banco existir, registra sucesso e só notifica após backup conc
   assert.ok(fs.existsSync(result.destination));
   assert.equal(pings.length, 1);
   assert.equal(pings[0], 'https://monitor.example.test/ping');
-  const status = JSON.parse(fs.readFileSync(path.join(backupDirectory, 'backup-status.json'), 'utf8'));
+  const status = JSON.parse(
+    fs.readFileSync(path.join(backupDirectory, 'backup-status.json'), 'utf8')
+  );
   assert.equal(status.success, true);
   assert.equal(status.sizeBytes > 0, true);
   assert.match(status.finishedAt, /Z$/);
@@ -75,7 +73,9 @@ test('falha de backup registra status sem notificar monitoramento', async (t) =>
     /Banco ainda nao existe/
   );
 
-  const status = JSON.parse(fs.readFileSync(path.join(backupDirectory, 'backup-status.json'), 'utf8'));
+  const status = JSON.parse(
+    fs.readFileSync(path.join(backupDirectory, 'backup-status.json'), 'utf8')
+  );
   assert.equal(status.success, false);
   assert.equal(status.errorCode, 'DATABASE_NOT_FOUND');
   assert.equal(typeof writeBackupStatus, 'function');
@@ -103,7 +103,10 @@ test('copia externa e cifrada com age, sem expor o SQLite fora do servidor', asy
   });
 
   assert.match(result.externalCopy, /\.db\.age$/);
-  assert.equal(fs.existsSync(path.join(externalDirectory, path.basename(result.destination))), false);
+  assert.equal(
+    fs.existsSync(path.join(externalDirectory, path.basename(result.destination))),
+    false
+  );
   const decrypter = new age.Decrypter();
   decrypter.addIdentity(identity);
   const plaintext = await decrypter.decrypt(fs.readFileSync(result.externalCopy));

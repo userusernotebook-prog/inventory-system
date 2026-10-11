@@ -22,7 +22,9 @@ test('tecnico solicita uso de backup e admin aprova pela interface', async ({ pa
     .locator('option')
     .filter({ hasText: 'backup-approval-e2e' });
   await page.getByLabel('Ativo em backup').selectOption(await backupOption.getAttribute('value'));
-  await page.getByLabel('Justificativa').fill('Equipamento adicional aprovado para a pessoa solicitante.');
+  await page
+    .getByLabel('Justificativa')
+    .fill('Equipamento adicional aprovado para a pessoa solicitante.');
   await page.getByRole('button', { name: 'Criar solicitacao' }).click();
   await expect(page.getByRole('heading', { name: 'Uso de equipamento em backup' })).toBeVisible();
   await expect(page.getByText('PENDENTE')).toBeVisible();

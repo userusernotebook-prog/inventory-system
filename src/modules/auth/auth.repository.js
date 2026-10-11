@@ -72,7 +72,9 @@ function createAuthRepository(db) {
           .map((row) => row.value)
           .filter(Boolean);
       return {
-        cities: values("SELECT DISTINCT trim(city) AS value FROM employees WHERE trim(coalesce(city,''))<>'' ORDER BY value"),
+        cities: values(
+          "SELECT DISTINCT trim(city) AS value FROM employees WHERE trim(coalesce(city,''))<>'' ORDER BY value"
+        ),
         departments: values(
           "SELECT DISTINCT trim(department) AS value FROM employees WHERE trim(coalesce(department,''))<>'' ORDER BY value"
         ),

@@ -26,7 +26,11 @@ function createAssetsService(db, repository, auditService, authService) {
       const result = repository.list(options, authService.scopes(user), {
         holderSearch: can(user, 'employee:read')
       });
-      return pageResult({ ...options, ...result, items: result.items.map((asset) => present(asset, user)) });
+      return pageResult({
+        ...options,
+        ...result,
+        items: result.items.map((asset) => present(asset, user))
+      });
     },
     get(id, user) {
       const scopes = authService.scopes(user);

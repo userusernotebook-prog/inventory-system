@@ -13,10 +13,16 @@ async function login(page, email, totp = '') {
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 }
 
-test('RH inicia, tecnico recebe e propoe desativacao, admin aprova e RH conclui pela interface', async ({ page }) => {
+test('RH inicia, tecnico recebe e propoe desativacao, admin aprova e RH conclui pela interface', async ({
+  page
+}) => {
   await login(page, 'rh.e2e@example.test');
   await page.getByRole('link', { name: 'Desligamentos' }).click();
-  await page.getByText(employeeName).locator('..').getByRole('button', { name: 'Iniciar desligamento' }).click();
+  await page
+    .getByText(employeeName)
+    .locator('..')
+    .getByRole('button', { name: 'Iniciar desligamento' })
+    .click();
   const start = page.getByRole('dialog', { name: 'Iniciar desligamento' });
   await start.getByLabel('Data de desligamento').fill('2026-12-31');
   await start.getByLabel('Motivo').fill('Encerramento de contrato para teste de interface.');
@@ -27,21 +33,37 @@ test('RH inicia, tecnico recebe e propoe desativacao, admin aprova e RH conclui 
   await login(page, 'tecnico.e2e@example.test');
   await page.getByRole('link', { name: 'Desligamentos' }).click();
   await expect(page.getByText('offboard-ui-e2e')).toBeVisible();
-  await page.getByRole('row', { name: /offboard-ui-e2e/ }).getByRole('button', { name: 'Receber equipamento' }).click();
+  await page
+    .getByRole('row', { name: /offboard-ui-e2e/ })
+    .getByRole('button', { name: 'Receber equipamento' })
+    .click();
   const receive = page.getByRole('dialog', { name: 'Receber equipamento' });
   await receive.getByLabel('Estado fisico').fill('Equipamento com falha de inicializacao.');
   await receive.getByLabel('Acessorios').fill('Carregador original');
   await receive.getByRole('button', { name: 'Confirmar recebimento' }).click();
-  await page.getByRole('row', { name: /offboard-ui-e2e/ }).getByRole('button', { name: 'Definir destino' }).click();
+  await page
+    .getByRole('row', { name: /offboard-ui-e2e/ })
+    .getByRole('button', { name: 'Definir destino' })
+    .click();
   const destination = page.getByRole('dialog', { name: 'Definir destino' });
   await destination.getByLabel('Destino').selectOption('DESATIVADO');
   await destination.getByLabel('Justificativa').fill('Falha de placa sem reparo viavel.');
-  await destination.getByLabel('Laudo tecnico').fill('Placa logica comprometida; reparo economicamente inviavel.');
+  await destination
+    .getByLabel('Laudo tecnico')
+    .fill('Placa logica comprometida; reparo economicamente inviavel.');
   await destination.getByRole('button', { name: 'Confirmar destino' }).click();
-  await expect(page.getByRole('row', { name: /offboard-ui-e2e/ }).getByRole('button', { name: 'Definir destino' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('row', { name: /offboard-ui-e2e/ })
+      .getByRole('button', { name: 'Definir destino' })
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await login(page, 'admin.e2e@example.test', await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' }));
+  await login(
+    page,
+    'admin.e2e@example.test',
+    await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' })
+  );
   await page.getByRole('link', { name: /Aprovacoes/ }).click();
   await page.getByLabel('Filtrar tipo').selectOption('DESATIVACAO_ATIVO');
   await page.getByRole('link', { name: 'Ver' }).first().click();
@@ -54,7 +76,11 @@ test('RH inicia, tecnico recebe e propoe desativacao, admin aprova e RH conclui 
   await page.getByRole('button', { name: 'Sair' }).click();
   await login(page, 'rh.e2e@example.test');
   await page.getByRole('link', { name: 'Desligamentos' }).click();
-  await page.getByText(employeeName).locator('..').getByRole('link', { name: 'Abrir checklist' }).click();
+  await page
+    .getByText(employeeName)
+    .locator('..')
+    .getByRole('link', { name: 'Abrir checklist' })
+    .click();
   await expect(page.getByText('Pendentes de recebimento')).toBeVisible();
   await page.getByRole('button', { name: 'Concluir desligamento' }).click();
   await page.getByRole('link', { name: 'Voltar para desligamentos' }).click();

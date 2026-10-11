@@ -23,40 +23,69 @@ function workbook({ code, invalid = false }) {
   // só um ativo em BACKUP; a inválida, um DESATIVADO (exige carga inicial) na linha 2.
   Object.assign(people, { '!ref': 'A1:L1' });
   Object.assign(assets, {
-    A2: { t: 's', v: '' }, B2: { t: 's', v: 'Notebook' }, F2: { t: 's', v: `SERIAL-${code}` }, G2: { t: 's', v: `REF-${code}` }, O2: { t: 's', v: invalid ? 'Desativado' : 'Backup' }, P2: { t: 's', v: invalid ? 'Sem reparo' : '' }, Q1: { t: 's', v: 'LAUDO TÉCNICO' }, Q2: { t: 's', v: invalid ? 'Laudo técnico de teste.' : '' }, '!ref': 'A1:Q2'
+    A2: { t: 's', v: '' },
+    B2: { t: 's', v: 'Notebook' },
+    F2: { t: 's', v: `SERIAL-${code}` },
+    G2: { t: 's', v: `REF-${code}` },
+    O2: { t: 's', v: invalid ? 'Desativado' : 'Backup' },
+    P2: { t: 's', v: invalid ? 'Sem reparo' : '' },
+    Q1: { t: 's', v: 'LAUDO TÉCNICO' },
+    Q2: { t: 's', v: invalid ? 'Laudo técnico de teste.' : '' },
+    '!ref': 'A1:Q2'
   });
   return XLSX.write(source, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('tecnico abre chamado, vê os equipamentos do funcionário e fecha com parecer', async ({ page }) => {
+test('tecnico abre chamado, vê os equipamentos do funcionário e fecha com parecer', async ({
+  page
+}) => {
   await login(page, 'tecnico.e2e@example.test');
   await page.getByRole('link', { name: 'Chamados' }).click();
   await page.getByRole('link', { name: 'Abrir chamado' }).click();
   await expect(page.getByRole('heading', { name: 'Abrir chamado' })).toBeVisible();
-  await page.getByLabel('Funcionário do chamado').selectOption({ label: 'Pessoa Chamados Interface E2E' });
+  await page
+    .getByLabel('Funcionário do chamado')
+    .selectOption({ label: 'Pessoa Chamados Interface E2E' });
   await expect(page.getByLabel('Equipamento do chamado')).toContainText('ticket-ui-e2e');
-  const assetOption = page.getByLabel('Equipamento do chamado').locator('option').filter({ hasText: 'ticket-ui-e2e' });
-  await page.getByLabel('Equipamento do chamado').selectOption(await assetOption.getAttribute('value'));
+  const assetOption = page
+    .getByLabel('Equipamento do chamado')
+    .locator('option')
+    .filter({ hasText: 'ticket-ui-e2e' });
+  await page
+    .getByLabel('Equipamento do chamado')
+    .selectOption(await assetOption.getAttribute('value'));
   await page.getByLabel('Descrição').fill('Usuário relata falha de conexão no notebook.');
   await page.getByRole('button', { name: 'Abrir chamado' }).click();
   await expect(page.getByText('Pessoa Chamados Interface E2E')).toBeVisible();
   await page.getByRole('button', { name: 'Fechar' }).click();
   const dialog = page.getByRole('dialog', { name: 'Fechar chamado' });
-  await dialog.getByLabel('Parecer técnico').fill('Adaptador de rede reinstalado e conexão normalizada.');
+  await dialog
+    .getByLabel('Parecer técnico')
+    .fill('Adaptador de rede reinstalado e conexão normalizada.');
   await dialog.getByRole('button', { name: 'Confirmar fechamento' }).click();
   await expect(page.getByText('closed', { exact: true })).toBeVisible();
 });
 
-test('tecnico pre-valida importacao com erro por linha e confirma uma planilha valida', async ({ page }) => {
+test('tecnico pre-valida importacao com erro por linha e confirma uma planilha valida', async ({
+  page
+}) => {
   await login(page, 'tecnico.e2e@example.test');
   await page.getByRole('link', { name: 'Importar Excel' }).click();
   const input = page.getByLabel('Planilha Excel');
-  await input.setInputFiles({ name: 'invalido.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook({ code: 'UI-INVALIDO', invalid: true }) });
+  await input.setInputFiles({
+    name: 'invalido.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: workbook({ code: 'UI-INVALIDO', invalid: true })
+  });
   await page.getByRole('button', { name: 'Pré-validar planilha' }).click();
   await expect(page.getByRole('heading', { name: 'Resultado da pré-validação' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Ativos', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '2', exact: true })).toBeVisible();
-  await input.setInputFiles({ name: 'valido.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: workbook({ code: `UI-${Date.now()}` }) });
+  await input.setInputFiles({
+    name: 'valido.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: workbook({ code: `UI-${Date.now()}` })
+  });
   await page.getByRole('button', { name: 'Pré-validar planilha' }).click();
   await expect(page.getByText('Pronta para importar:')).toBeVisible();
   await page.getByRole('button', { name: 'Confirmar importação' }).click();
@@ -64,7 +93,11 @@ test('tecnico pre-valida importacao com erro por linha e confirma uma planilha v
 });
 
 test('admin consulta auditoria e status do ultimo backup pela interface', async ({ page }) => {
-  await login(page, 'admin.e2e@example.test', await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' }));
+  await login(
+    page,
+    'admin.e2e@example.test',
+    await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' })
+  );
   await page.getByRole('link', { name: 'Administracao' }).click();
   await expect(page.getByRole('heading', { name: 'Administração' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Último backup' })).toBeVisible();

@@ -42,7 +42,10 @@ const id = z.object({ id: z.coerce.number().int().positive() });
 const userList = paginationSchema.extend({
   q: z.string().trim().max(120).optional(),
   profile_base: z.enum(['ADMIN', 'TECNICO', 'RH', 'FINANCEIRO', 'CONSULTA']).optional(),
-  active: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  active: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   sortBy: z.enum(['name', 'email', 'profile_base', 'last_login_at']).optional()
 });
 const totp = z.object({ code: z.string().min(6) });

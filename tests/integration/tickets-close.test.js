@@ -37,7 +37,10 @@ test('tecnico encerra chamado com parecer e consulta nao pode encerrar', async (
     assert.match(ticket.technical_opinion, /Adaptador/);
     assert.match(ticket.closed_at, /Z$/);
     await context.agent.post('/api/auth/logout');
-    assert.equal((await login(context.agent, consultation.email, consultation.password)).status, 200);
+    assert.equal(
+      (await login(context.agent, consultation.email, consultation.password)).status,
+      200
+    );
     const forbidden = await context.agent
       .post(`/api/tickets/${created.body.id}/close`)
       .send({ technical_opinion: 'Tentativa indevida.' });

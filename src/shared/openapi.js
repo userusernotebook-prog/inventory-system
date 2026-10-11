@@ -110,7 +110,9 @@ function buildOpenApi() {
         post: operation('ticket:create', 'Cria chamado')
       },
       '/api/tickets/{id}/close': {
-        post: operation('ticket:close', 'Encerra chamado com parecer técnico', { parameters: identifier })
+        post: operation('ticket:close', 'Encerra chamado com parecer técnico', {
+          parameters: identifier
+        })
       },
       '/api/approval-requests': {
         get: operation('request:create', 'Lista solicitações', {

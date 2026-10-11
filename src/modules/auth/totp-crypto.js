@@ -3,7 +3,8 @@ const crypto = require('node:crypto');
 function encryptionKey(value) {
   if (!value) throw new Error('TOTP_ENCRYPTION_KEY e obrigatoria.');
   const key = Buffer.from(value, 'base64');
-  if (key.length !== 32) throw new Error('TOTP_ENCRYPTION_KEY deve ter exatamente 32 bytes em base64.');
+  if (key.length !== 32)
+    throw new Error('TOTP_ENCRYPTION_KEY deve ter exatamente 32 bytes em base64.');
   return key;
 }
 
@@ -19,8 +20,13 @@ function encryptTotpSecret(secret, keyValue) {
 function decryptTotpSecret(value, keyValue) {
   if (!value || !value.startsWith('v1:')) return value;
   const [, nonceValue, tagValue, encryptedValue] = value.split(':');
-  if (!nonceValue || !tagValue || !encryptedValue) throw new Error('Segredo TOTP cifrado em formato invalido.');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(keyValue), Buffer.from(nonceValue, 'base64url'));
+  if (!nonceValue || !tagValue || !encryptedValue)
+    throw new Error('Segredo TOTP cifrado em formato invalido.');
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    encryptionKey(keyValue),
+    Buffer.from(nonceValue, 'base64url')
+  );
   decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
   return Buffer.concat([
     decipher.update(Buffer.from(encryptedValue, 'base64url')),
@@ -33,7 +39,9 @@ function migrateTotpSecrets(db, resolveKey) {
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").get())
     return 0;
   const rows = db
-    .prepare("SELECT id,totp_secret FROM users WHERE totp_secret IS NOT NULL AND totp_secret NOT LIKE 'v1:%'")
+    .prepare(
+      "SELECT id,totp_secret FROM users WHERE totp_secret IS NOT NULL AND totp_secret NOT LIKE 'v1:%'"
+    )
     .all();
   if (!rows.length) return 0;
   const keyValue = resolveKey();

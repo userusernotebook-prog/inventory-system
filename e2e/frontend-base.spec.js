@@ -3,13 +3,15 @@ const { generate } = require('otplib');
 
 const password = 'SenhaDeTesteForte1';
 
-test('admin faz login com 2FA, ve menu permitido e encerra a sessao pela interface', async ({ page }) => {
+test('admin faz login com 2FA, ve menu permitido e encerra a sessao pela interface', async ({
+  page
+}) => {
   await page.goto('/#/login');
   await page.getByLabel('E-mail').fill('admin.e2e@example.test');
   await page.getByLabel('Senha').fill(password);
-  await page.getByLabel(/Codigo 2FA/i).fill(
-    await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' })
-  );
+  await page
+    .getByLabel(/Codigo 2FA/i)
+    .fill(await generate({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' }));
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ativos' })).toBeVisible();

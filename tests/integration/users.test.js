@@ -121,8 +121,8 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
     assert.equal(permissions.body.denied.includes('employee:read'), true);
 
     const scopes = await context.agent.put(`/api/users/${userId}/scopes`).send({
-      scopes: [{ type: 'city', value: 'São Paulo' }]
-      ,reason: 'Alcance operacional definido.'
+      scopes: [{ type: 'city', value: 'São Paulo' }],
+      reason: 'Alcance operacional definido.'
     });
     assert.equal(scopes.status, 200, JSON.stringify(scopes.body));
     assert.deepEqual(
@@ -132,7 +132,9 @@ test('administrador gerencia todos os endpoints de usuarios', async () => {
       [{ scope_type: 'city', scope_value: 'São Paulo' }]
     );
     const overrideAudit = context.db
-      .prepare("SELECT details FROM audit_log WHERE action='permission_override' ORDER BY id DESC LIMIT 1")
+      .prepare(
+        "SELECT details FROM audit_log WHERE action='permission_override' ORDER BY id DESC LIMIT 1"
+      )
       .get();
     assert.equal(JSON.parse(overrideAudit.details).reason, 'Restricao individual aprovada.');
   } finally {
