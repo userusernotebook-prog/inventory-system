@@ -120,7 +120,14 @@ async function encryptExternalCopy(sourceFile, externalDirectory, recipient) {
     fs.writeFileSync(partial, encrypted, { flag: 'wx', mode: 0o600 });
     fs.renameSync(partial, destination);
   } catch (error) {
-    fs.rmSync(partial, { force: true });
+    // Se o diretório externo foi montado incorretamente (por exemplo, é um
+    // arquivo), o caminho parcial não pode ser removido. Essa limpeza não
+    // pode ocultar o erro de cópia que será registrado no status do backup.
+    try {
+      fs.rmSync(partial, { force: true });
+    } catch {
+      // Não há arquivo parcial acessível para remover.
+    }
     throw codedError(
       'EXTERNAL_COPY_FAILED',
       `Falha ao gravar a cópia externa: ${error.message}`,

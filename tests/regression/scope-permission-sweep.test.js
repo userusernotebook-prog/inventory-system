@@ -135,7 +135,24 @@ async function scenario(t) {
     return { ...user, session };
   }
   const adminSession = request.agent(app);
-  await login(adminSession, admin.email, password, await generate({ secret: totpSecret }));
+  let adminLogin = await login(
+    adminSession,
+    admin.email,
+    password,
+    await generate({ secret: totpSecret })
+  );
+  // Se o primeiro código foi gerado no fim da janela TOTP, gere um novo
+  // código. Sem esta checagem o teste continuava com uma sessão anônima e
+  // escondia a causa real do erro.
+  if (adminLogin.status === 401) {
+    adminLogin = await login(
+      adminSession,
+      admin.email,
+      password,
+      await generate({ secret: totpSecret })
+    );
+  }
+  assert.equal(adminLogin.status, 200, JSON.stringify(adminLogin.body));
 
   // Solicitação de outra pessoa sobre ativo fora do alcance.
   const foreign = await adminSession.post('/api/approval-requests').send({
