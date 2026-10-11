@@ -41,15 +41,12 @@ test('perfis, deny, alcance e proteção contra escalada de privilégios', async
 
     assert.doesNotThrow(() => service.authorize(technician, 'asset:create'));
     assert.throws(() => service.authorize(technician, 'report:financial'), /permissão/);
-
     service.setOverrides(created.id, [{ permission: 'asset:read', effect: 'deny' }], admin);
     assert.throws(() => service.authorize(technician, 'asset:read'), /permissão/);
     assert.doesNotThrow(() => service.authorize(technician, 'asset:create'));
-
     service.setScopes(created.id, [{ type: 'city', value: 'São Paulo' }], admin);
     assert.doesNotThrow(() => service.assertScope(technician, { city: 'São Paulo' }));
     assert.throws(() => service.assertScope(technician, { city: 'Rio de Janeiro' }), /alcance/);
-
     assert.throws(
       () => service.setOverrides(created.id, [{ permission: '*:*', effect: 'allow' }], technician),
       /próprios privilégios/
@@ -114,6 +111,90 @@ test('2FA só é confirmado com um código TOTP válido', async () => {
       totp_code: code
     });
     assert.ok(login.token);
+  } finally {
+    db.close();
+  }
+});
+
+test('controles administrativos validam alvos, duplicidades e consultas de permissao', async () => {
+  const { db, repository, service, adminId } = await makeContext();
+  try {
+    const admin = repository.findById(adminId);
+    const created = await service.createUser(
+      {
+        name: 'Operador',
+        email: 'operador@example.test',
+        password: 'SenhaProvisoria1',
+        profileBase: 'TECNICO'
+      },
+      admin
+    );
+    const operator = repository.findById(created.id);
+    assert.equal(service.authenticate(), null);
+    assert.equal(service.can(null, 'asset:read'), false);
+    assert.throws(() => service.effectivePermissions(null), { name: 'ValidationError' });
+    assert.throws(() => service.userAdministration(999), { name: 'ValidationError' });
+    assert.equal(service.userAdministration(created.id).user.email, 'operador@example.test');
+    assert.throws(() => service.forceLogout(created.id, operator, 'Tentativa própria'), /Use sair/);
+    assert.throws(() => service.forceLogout(999, admin, 'Conta ausente'), {
+      name: 'ValidationError'
+    });
+    assert.throws(
+      () =>
+        service.setOverrides(
+          created.id,
+          [
+            { permission: 'asset:read', effect: 'allow' },
+            { permission: 'asset:read', effect: 'deny' }
+          ],
+          admin,
+          'Duplicidade de teste'
+        ),
+      /repetida/
+    );
+    assert.throws(
+      () =>
+        service.setOverrides(
+          created.id,
+          [{ permission: 'inexistente:tudo', effect: 'allow' }],
+          admin,
+          'Permissão inexistente'
+        ),
+      /desconhecida/
+    );
+    assert.throws(
+      () =>
+        service.setScopes(
+          created.id,
+          [
+            { type: 'city', value: 'Recife' },
+            { type: 'city', value: 'recife' }
+          ],
+          admin,
+          'Duplicidade de alcance'
+        ),
+      /Alcance repetido/
+    );
+    assert.throws(
+      () =>
+        service.setOverrides(
+          adminId,
+          [{ permission: 'asset:read', effect: 'deny' }],
+          operator,
+          'Tentativa contra admin'
+        ),
+      /administrador/
+    );
+    assert.throws(
+      () =>
+        service.setScopes(
+          adminId,
+          [{ type: 'city', value: 'Recife' }],
+          operator,
+          'Tentativa contra admin'
+        ),
+      /administrador/
+    );
   } finally {
     db.close();
   }

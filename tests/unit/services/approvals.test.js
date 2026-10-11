@@ -253,3 +253,134 @@ test('troca é atômica, desativação exige laudo e autoaprovação é auditada
     ctx.db.close();
   }
 });
+
+test('consultas, pendencias e acessos de aprovacoes respeitam o solicitante', () => {
+  const ctx = setup();
+  try {
+    const backup = ctx.asset(ASSET_STATES.BACKUP, 'BACKUP-CONSULTA');
+    const request = ctx.approvals.create(
+      {
+        type: 'USO_EQUIPAMENTO_BACKUP',
+        asset_id: backup,
+        employee_id: ctx.employeeId,
+        justification: 'Cobrir a leitura de solicitações'
+      },
+      ctx.requester
+    );
+    assert.equal(ctx.approvals.list({ page: 1, pageSize: 25 }, ctx.requester).total, 1);
+    assert.equal(ctx.approvals.get(request.id, ctx.requester).employee_name, 'Pessoa');
+    assert.throws(() => ctx.approvals.get(request.id, { id: 999, profile_base: 'TECNICO' }), {
+      name: 'ForbiddenError'
+    });
+    assert.equal(
+      ctx.approvals.get(request.id, { id: ctx.requester.id, profile_base: 'FINANCEIRO' })
+        .employee_name,
+      null
+    );
+    assert.throws(() => ctx.approvals.get(999, ctx.admin), { name: 'NotFoundError' });
+    assert.throws(() => ctx.approvals.pendingCount(ctx.requester), { name: 'ForbiddenError' });
+    assert.equal(ctx.approvals.pendingCount(ctx.admin), 1);
+    assert.deepEqual(ctx.approvals.notifications(ctx.requester), []);
+    assert.throws(() => ctx.approvals.cancel(request.id, ctx.admin, 'Não sou solicitante'), {
+      name: 'ForbiddenError'
+    });
+    assert.deepEqual(ctx.approvals.cancel(request.id, ctx.requester, 'Sem necessidade'), {
+      ok: true
+    });
+  } finally {
+    ctx.db.close();
+  }
+});
+
+test('solicitações validam tipo, campos e transição antes de reservar ativos', () => {
+  const ctx = setup();
+  try {
+    const backup = ctx.asset(ASSET_STATES.BACKUP, 'BACKUP-VALIDACAO');
+    assert.throws(
+      () =>
+        ctx.approvals.create(
+          {
+            type: 'TIPO_INEXISTENTE',
+            asset_id: backup,
+            justification: 'Tipo inválido'
+          },
+          ctx.requester
+        ),
+      { name: 'ValidationError' }
+    );
+    assert.throws(
+      () =>
+        ctx.approvals.create(
+          {
+            type: 'USO_EQUIPAMENTO_BACKUP',
+            asset_id: backup,
+            justification: 'Funcionário obrigatório'
+          },
+          ctx.requester
+        ),
+      { name: 'ValidationError' }
+    );
+    assert.throws(
+      () =>
+        ctx.approvals.create(
+          {
+            type: 'TROCA_EQUIPAMENTO',
+            old_asset_id: backup,
+            new_asset_id: backup,
+            employee_id: ctx.employeeId,
+            justification: 'Ativos diferentes'
+          },
+          ctx.requester
+        ),
+      { name: 'ValidationError' }
+    );
+    const request = ctx.approvals.create(
+      {
+        type: 'USO_EQUIPAMENTO_BACKUP',
+        asset_id: backup,
+        employee_id: ctx.employeeId,
+        justification: 'Com anexo',
+        attachments: [{ name: 'laudo.txt', url: 'https://example.test/laudo.txt' }]
+      },
+      ctx.requester
+    );
+    assert.deepEqual(
+      ctx.db
+        .prepare('SELECT name,url FROM approval_request_attachments WHERE request_id=?')
+        .all(request.id),
+      [{ name: 'laudo.txt', url: 'https://example.test/laudo.txt' }]
+    );
+  } finally {
+    ctx.db.close();
+  }
+});
+
+test('aprovação rejeita troca cujo ativo antigo mudou de funcionário', () => {
+  const ctx = setup();
+  try {
+    const oldAsset = ctx.asset(ASSET_STATES.IN_USE, 'OLD-HOLDER');
+    const newAsset = ctx.asset(ASSET_STATES.BACKUP, 'NEW-HOLDER');
+    ctx.db
+      .prepare('INSERT INTO assignments(asset_id,employee_id) VALUES(?,?)')
+      .run(oldAsset, ctx.employeeId);
+    const request = ctx.approvals.create(
+      {
+        type: 'TROCA_EQUIPAMENTO',
+        old_asset_id: oldAsset,
+        new_asset_id: newAsset,
+        employee_id: ctx.employeeId,
+        justification: 'Cobertura de conflito de titularidade'
+      },
+      ctx.requester
+    );
+    ctx.db
+      .prepare('UPDATE assignments SET returned_at=? WHERE asset_id=?')
+      .run(new Date().toISOString(), oldAsset);
+    assert.throws(
+      () => ctx.approvals.approve(request.id, ctx.admin),
+      /não está mais com o funcionário/
+    );
+  } finally {
+    ctx.db.close();
+  }
+});

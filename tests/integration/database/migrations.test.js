@@ -29,16 +29,7 @@ function runMigration(testDir) {
   assert.equal(result.status, 0, result.stderr);
 }
 
-function runRollback(testDir) {
-  const result = spawnSync(process.execPath, ['scripts/rollback-migration.js', '005'], {
-    cwd: testDir,
-    env: { ...process.env, NODE_PATH: path.join(projectDir, 'node_modules') },
-    encoding: 'utf8'
-  });
-  assert.equal(result.status, 0, result.stderr);
-}
-
-test('migrations preservam registros dos bancos antigo e atual e são idempotentes', () => {
+test('migrations preservam registros de bancos antigos e atuais e são idempotentes', () => {
   for (const version of ['legacy', 'current']) {
     const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-migration-test-'));
     try {
@@ -90,13 +81,16 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
         fs.writeFileSync(migrationPath, sql.replace(/\n/g, '\r\n'));
       }
       runMigration(testDir);
+
       const migrated = new Database(dbPath);
       try {
         assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(migrated.pragma('foreign_key_check'), []);
         assert.equal(
           migrated.prepare('SELECT COUNT(*) n FROM schema_migrations').get().n,
-          fs.readdirSync(path.join(projectDir, 'src', 'db', 'migrations')).filter((name) => name.endsWith('.sql')).length
+          fs
+            .readdirSync(path.join(projectDir, 'src', 'db', 'migrations'))
+            .filter((name) => name.endsWith('.sql')).length
         );
         assert.equal(
           migrated.prepare('SELECT checksum FROM schema_migrations WHERE version=1').get().checksum,
@@ -131,9 +125,10 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
         for (const table of ['assignments', 'movements', 'tickets', 'audit_log']) {
           assert.equal(migrated.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n, 1);
         }
-        const columns = migrated.pragma('table_info(employees)').map((column) => column.name);
         for (const name of ['offboarded_at', 'cost_center', 'hire_date']) {
-          assert.ok(columns.includes(name));
+          assert.ok(
+            migrated.pragma('table_info(employees)').some((column) => column.name === name)
+          );
         }
         assert.throws(
           () => migrated.prepare('DELETE FROM movements WHERE id=1').run(),
@@ -146,79 +141,5 @@ test('migrations preservam registros dos bancos antigo e atual e são idempotent
       assert.equal(path.dirname(path.resolve(testDir)), path.resolve(os.tmpdir()));
       fs.rmSync(testDir, { recursive: true, force: true });
     }
-  }
-});
-
-test('a migration do estado do ativo pode ser revertida e aplicada novamente', () => {
-  const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-migration-test-'));
-  try {
-    fs.mkdirSync(path.join(testDir, 'data'));
-    fs.mkdirSync(path.join(testDir, 'scripts'));
-    fs.copyFileSync(path.join(projectDir, 'db.js'), path.join(testDir, 'db.js'));
-    fs.copyFileSync(
-      path.join(projectDir, 'scripts', 'rollback-migration.js'),
-      path.join(testDir, 'scripts', 'rollback-migration.js')
-    );
-    fs.cpSync(path.join(projectDir, 'src'), path.join(testDir, 'src'), { recursive: true });
-    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '006_users_and_permissions.sql'));
-    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '007_approval_requests.sql'));
-    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '008_offboarding_governance.sql'));
-    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '009_utc_timestamps_and_employee_code.sql'));
-    fs.rmSync(path.join(testDir, 'src', 'db', 'migrations', '010_audit_log_immutable.sql'));
-    const dbPath = path.join(testDir, 'data', 'inventory.db');
-    const db = new Database(dbPath);
-    try {
-      db.exec(initSql);
-      db.prepare(
-        "INSERT INTO assets(id,equipment_type,serial,status) VALUES(1,'Notebook','SER-ROLLBACK','backup')"
-      ).run();
-    } finally {
-      db.close();
-    }
-
-    runMigration(testDir);
-    const migrated = new Database(dbPath);
-    try {
-      migrated.prepare("UPDATE assets SET status='EM_AVALIACAO' WHERE id=1").run();
-    } finally {
-      migrated.close();
-    }
-
-    runRollback(testDir);
-    const rolledBack = new Database(dbPath);
-    try {
-      assert.equal(
-        rolledBack.prepare('SELECT status FROM assets WHERE id=1').get().status,
-        'backup'
-      );
-      assert.equal(
-        rolledBack.prepare('SELECT MAX(version) version FROM schema_migrations').get().version,
-        4
-      );
-    } finally {
-      rolledBack.close();
-    }
-
-    runMigration(testDir);
-    const reapplied = new Database(dbPath);
-    try {
-      assert.equal(
-        reapplied.prepare('SELECT status FROM assets WHERE id=1').get().status,
-        'EM_AVALIACAO'
-      );
-      assert.equal(
-        reapplied
-          .prepare(
-            "SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name='movements_prevent_delete'"
-          )
-          .get().n,
-        1
-      );
-    } finally {
-      reapplied.close();
-    }
-  } finally {
-    assert.equal(path.dirname(path.resolve(testDir)), path.resolve(os.tmpdir()));
-    fs.rmSync(testDir, { recursive: true, force: true });
   }
 });

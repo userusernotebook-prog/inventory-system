@@ -7,12 +7,11 @@
     "prepare": "node scripts/install-git-hooks.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "web:dev": "vite --config frontend/vite.config.ts",
-    "web:build": "vite build --config frontend/vite.config.ts",
+    "web:dev": "vite --config frontend/vite.config.mts",
+    "web:build": "vite build --config frontend/vite.config.mts",
     "web:typecheck": "tsc --project frontend/tsconfig.json",
     "backup": "node scripts/backup.js",
     "backup:verify-restore": "node scripts/verify-backup-restore.js",
-    "db:rollback": "node scripts/rollback-migration.js",
     "create-admin": "node scripts/create-admin.js",
     "reset-admin": "node scripts/reset-admin.js",
     "privacy:anonymize": "node scripts/anonymize-offboarded.js",
@@ -20,10 +19,10 @@
     "test:unit": "node --test --test-concurrency=1 \"tests/unit/**/*.test.js\"",
     "test:integration": "node --test --test-concurrency=1 \"tests/integration/**/*.test.js\"",
     "test:e2e": "playwright test",
-    "coverage": "c8 --check-coverage --lines 80 --functions 80 --statements 80 --branches 70 --reporter=text --reporter=lcov --include=src/modules/**/domain/**/*.js --include=src/modules/**/*.service.js node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/*.test.js\"",
+    "coverage": "c8 --reporter=text --reporter=lcov --reporter=json-summary --reports-dir coverage --include=src/modules/auth/auth.service.js --include=src/modules/approvals/approvals.service.js --include=src/modules/movements/movements.service.js --include=src/modules/assignments/assignments.service.js --include=src/modules/assets/domain/asset-state-machine.js node --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/*.test.js\" && node scripts/check-critical-coverage.js coverage/coverage-summary.json",
     "lint": "eslint .",
-    "format": "prettier --write \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"frontend/**/*.{ts,tsx,css,html}\" \"*.{json,md}\" .prettierrc.json",
-    "format:check": "prettier --check \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"e2e/**/*.js\" \"frontend/**/*.{ts,tsx,css,html}\" \"*.{json,md,yml,yaml}\" .prettierrc.json"
+    "format": "prettier --write \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"e2e/**/*.js\" \"frontend/**/*.{ts,tsx,mts,css,html}\" \"*.{json,md,yml,yaml}\" .prettierrc.json",
+    "format:check": "prettier --check \"*.{js,cjs}\" \"src/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"e2e/**/*.js\" \"frontend/**/*.{ts,tsx,mts,css,html}\" \"*.{json,md,yml,yaml}\" .prettierrc.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

@@ -23,5 +23,6 @@ jobs:
       - run: npm run web:typecheck
       - run: npm test
       - run: npm run coverage
-      - run: npm run test:e2e
       - run: npm run web:build
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e

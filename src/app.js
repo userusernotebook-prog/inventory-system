@@ -75,11 +75,8 @@ function createApp(db) {
     authService
   );
   const assignmentsService = createAssignmentsService(
-    db,
     assignmentsRepository,
     employeesRepository,
-    movementsService,
-    auditService,
     authService
   );
   const ticketsService = createTicketsService(

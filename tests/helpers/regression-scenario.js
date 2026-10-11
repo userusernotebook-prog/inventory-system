@@ -24,8 +24,15 @@ async function apiScenario(t) {
 
   async function sessionFor(user) {
     const session = request.agent(app);
-    const code = user.profile === 'ADMIN' ? await generate({ secret: totpSecret }) : undefined;
-    const response = await login(session, user.email, password, code);
+    let code = user.profile === 'ADMIN' ? await generate({ secret: totpSecret }) : undefined;
+    let response = await login(session, user.email, password, code);
+    // O código pode vencer entre a geração e a requisição quando o teste começa
+    // no limite de uma janela TOTP de 30 segundos. Uma única nova tentativa
+    // preserva a validação real sem tornar a suíte intermitente.
+    if (user.profile === 'ADMIN' && response.status === 401) {
+      code = await generate({ secret: totpSecret });
+      response = await login(session, user.email, password, code);
+    }
     assert.equal(response.status, 200, JSON.stringify(response.body));
     return session;
   }

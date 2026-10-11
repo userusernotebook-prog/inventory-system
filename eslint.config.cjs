@@ -44,10 +44,6 @@ module.exports = [
     rules: { ...eslint.configs.recommended.rules, 'no-unused-vars': 'off' }
   },
   {
-    files: ['public/app.js'],
-    languageOptions: { globals: { dashboard: 'readonly' } }
-  },
-  {
     files: ['public/dashboard.js'],
     languageOptions: {
       globals: {

@@ -83,7 +83,7 @@ As permissoes usam `recurso:acao`. O perfil fornece a base e o admin pode conced
 | `ADMIN`      | Tudo, incluindo auditoria, usuarios e aprovacoes. Ha apenas um administrador. |
 | `TECNICO`    | Le, cadastra e edita ativos; recebe e avalia equipamentos; cria solicitacoes. |
 | `RH`         | Gerencia funcionarios, inicia e conclui desligamentos; cria solicitacoes.     |
-| `FINANCEIRO` | Le ativos com valores; nao altera ativos.                                    |
+| `FINANCEIRO` | Le ativos com valores; nao altera ativos.                                     |
 | `CONSULTA`   | Somente leitura com mascaramento de dados pessoais.                           |
 
 Todos entram por e-mail e senha. O admin cadastra usuarios com senha provisoria; eles precisam troca-la no primeiro acesso. Sessao usa cookie `httpOnly`, `SameSite=Strict`, `Secure` em producao, expiracao e bloqueio temporario apos tentativas falhas. O header `x-technician-id` nao e aceito.
@@ -119,18 +119,21 @@ A importacao (`asset:create`) respeita permissoes e alcance de quem importa. Sem
 
 ```powershell
 npm run lint
+npm run format
 npm run format:check
+npm test
 npm run test:unit
 npm run test:integration
+npx playwright install
 npm run test:e2e
 npm run coverage
 npm run web:typecheck
 npm run web:build
 ```
 
-O minimo verificado e 80% de statements, linhas e funcoes de dominio/services; branches exigem 70%. A suite de integracao injeta SQLite em memoria em `createApp(db)`, sem copiar o projeto ou iniciar processo manual. O E2E Playwright executa o desligamento completo por HTTP com banco isolado.
+`npm run coverage` exige, separadamente para cada arquivo critico, pelo menos 80% de linhas e 80% de branches em `auth.service`, `approvals.service`, `movements.service`, `assignments.service` e na maquina de estados do ativo. A suite de integracao injeta SQLite em memoria em `createApp(db)`, sem copiar o projeto ou iniciar processo manual. Os testes E2E Playwright abrem o navegador Chromium contra um banco isolado.
 
-O workflow `.github/workflows/ci.yml` roda lint, formatacao, tipos, testes, cobertura, E2E e build no Node 22 em cada push e pull request.
+O workflow `.github/workflows/ci.yml` roda lint, formatacao, tipos, testes, cobertura e build no Node 22 em cada push e pull request; antes do E2E ele executa `npx playwright install --with-deps`.
 
 ## Docker, Nginx e HTTPS
 
@@ -172,11 +175,17 @@ Teste de restauracao recomendado, ao menos mensalmente:
 
 1. No servidor, execute `npm run backup:verify-restore` para restaurar a copia local mais recente em uma pasta temporaria e conferir a integridade.
 2. Na maquina que guarda a chave privada, teste a copia externa: `$env:AGE_IDENTITY_FILE="C:\cofre\inventario-backup.key"` e `npm run backup:verify-restore -- \\nas\inventory-backups\inventory-<data>.db.age`. O comando decifra em pasta temporaria, restaura e roda `integrity_check` e `foreign_key_check`. Com a CLI do age, o equivalente e `age -d -i inventario-backup.key inventory-<data>.db.age > inventory-restaurado.db` seguido de `npm run backup:verify-restore -- inventory-restaurado.db`.
-3. Para recuperar dados, pare a aplicacao: `docker compose stop app`.
-4. Preserve o arquivo atual: renomeie `inventory.db` para `inventory.db.before-restore`.
-5. Copie o backup escolhido (decifrado, se vier da copia externa) para `inventory.db` no volume `data/`.
-6. Rode `npm run backup:verify-restore <caminho-do-backup>` e inicie `docker compose start app`.
-7. Valide login, contagem de ativos e os ultimos movimentos antes de liberar usuarios.
+3. Para recuperar dados no Docker, primeiro pare a aplicacao e o agendador: `docker compose stop app backup`.
+4. Valide antes o arquivo escolhido com `npm run backup:verify-restore <caminho-do-backup>`; se a copia vier da pasta externa, decifre-a na maquina que guarda a chave privada.
+5. Preserve uma copia do banco atual e restaure pelo volume nomeado `inventory-data` em um conteiner temporario. O comando tambem remove os arquivos WAL e SHM antigos antes de copiar o banco:
+
+```powershell
+docker run --rm -v inventory-data:/data -v "${PWD}\restore:/restore:ro" alpine sh -c "cp /data/inventory.db /data/inventory.db.before-restore 2>/dev/null || true; rm -f /data/inventory.db-wal /data/inventory.db-shm; cp /restore/inventory.db /data/inventory.db; chown 1000:1000 /data/inventory.db"
+```
+
+Coloque o backup validado com o nome `inventory.db` na pasta local `restore` antes de executar o comando.
+
+6. Inicie `docker compose start app backup` e valide login, contagem de ativos e os ultimos movimentos antes de liberar usuarios.
 
 ## Recuperacao do administrador
 
